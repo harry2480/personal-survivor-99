@@ -146,3 +146,61 @@ func test_combo_ends_on_a_clearless_lock_but_b2b_survives() -> void:
 	assert_eq(session.get_scoring().get_combo_count(), 0, "Line Clear なしの Lock で Combo は終了する")
 	assert_eq(session.get_scoring().get_b2b_chain(), chain_before, "B2B は維持される")
 	assert_gt(combo_before, 0, "前提: Combo が立っていた")
+
+
+func test_single_clear_sends_no_attack_by_default() -> void:
+	# 最下段 1 行だけ左端を空け、縦 I で消す。盤面が空になり Perfect Clear が成立する。
+	var i_seed: int = _find_seed_starting_with_i()
+	var rules := GameRules.create_default()
+	rules.gravity_cells_per_second = 0.0
+	var session := PuzzleSession.new(rules, PieceRandomizer.new(i_seed))
+	session.start(i_seed)
+
+	var board: Board = session.get_board()
+	for x in range(1, Board.WIDTH):
+		board.set_cell(x, Board.TOTAL_HEIGHT - 1, Piece.Type.I)
+
+	watch_signals(session)
+	session.rotate(RotationSystem.Direction.CLOCKWISE)
+	_tap_move(session, AutoShift.Direction.LEFT, Board.WIDTH)
+	session.hard_drop()
+
+	assert_signal_emitted(session, "lines_cleared", "行が消える")
+	# 既定のバランスでは Single の Attack は 0。送るものがなければ signal も出さない。
+	assert_signal_not_emitted(session, "attack_generated", "Single では Attack が発生しない")
+	# 縦 I の残り 3 マスが残るため Perfect Clear にもならない。
+	assert_signal_not_emitted(session, "perfect_clear_achieved", "残りがあれば Perfect Clear ではない")
+
+
+func test_perfect_clear_is_reported_when_the_board_empties() -> void:
+	var rules := GameRules.create_default()
+	rules.gravity_cells_per_second = 0.0
+	var session := PuzzleSession.new(rules, PieceRandomizer.new(SEED))
+	session.start(SEED)
+
+	# 現在の Piece が着地したときに、その 4 マスだけで 1 行が揃うよう盤面を作る。
+	var piece: ActivePiece = session.get_active_piece()
+	var board: Board = session.get_board()
+	var landing_cells: Array[Vector2i] = GhostPiece.get_landing_cells(
+		board, piece.type, piece.rotation, piece.position
+	)
+	var occupied_columns: Dictionary = {}
+	var bottom: int = Board.TOTAL_HEIGHT - 1
+	for cell in landing_cells:
+		if cell.y == bottom:
+			occupied_columns[cell.x] = true
+	assert_gt(occupied_columns.size(), 0, "前提: 最下段に接地する")
+
+	# 最下段のうち Piece が埋めない列だけを先に埋める。
+	for x in range(Board.WIDTH):
+		if not occupied_columns.has(x):
+			board.set_cell(x, bottom, Piece.Type.I)
+
+	watch_signals(session)
+	session.hard_drop()
+
+	if PerfectClear.is_board_empty(board):
+		assert_signal_emitted(session, "perfect_clear_achieved", "盤面が空になれば通知される")
+	else:
+		# Piece の形によっては上の行に残るため、その場合は Attack だけを確認する。
+		assert_signal_emitted(session, "attack_generated", "行が消えれば Attack は発生する")

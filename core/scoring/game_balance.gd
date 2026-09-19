@@ -18,6 +18,28 @@ extends Resource
 ## T-Spin を Back-to-Back の対象に含めるか（T-Spin 判定は #29）。
 @export var b2b_includes_t_spin: bool = true
 
+## Clear 種別ごとの Base Attack（index は [enum LineClear.Type]）。
+@export var line_attack_table: PackedInt32Array = PackedInt32Array([0, 0, 1, 2, 4])
+
+## T-Spin の Clear 種別ごとの Attack（index は [enum LineClear.Type]）。
+##
+## T-Spin が成立したときは [member line_attack_table] の代わりにこちらを使う。
+@export var t_spin_attack_table: PackedInt32Array = PackedInt32Array([0, 2, 4, 6, 6])
+
+## T-Spin Mini の Clear 種別ごとの Attack（index は [enum LineClear.Type]）。
+@export var t_spin_mini_attack_table: PackedInt32Array = PackedInt32Array([0, 0, 1, 2, 4])
+
+## Back-to-Back が成立しているときの加算値。
+@export_range(0, 10, 1, "or_greater") var b2b_bonus: int = 1
+
+## Perfect Clear の Clear 種別ごとの Attack（index は [enum LineClear.Type]）。
+@export var perfect_clear_attack_table: PackedInt32Array = PackedInt32Array([0, 10, 10, 10, 10])
+
+## Perfect Clear の Attack を、通常の Attack に加算するか置き換えるか。
+##
+## true なら置き換える（Perfect Clear の値だけを使う）。
+@export var perfect_clear_replaces_attack: bool = true
+
 ## Combo 段数ごとの Attack 加算値。
 ##
 ## index は「連続 Line Clear 数 - 1」。1 回目の Clear は Combo 0 として index 0 を見る。
@@ -42,6 +64,23 @@ func is_b2b_clear(clear_type: LineClear.Type, is_t_spin: bool = false) -> bool:
 	return clear_type in b2b_clear_types
 
 
+## Clear 種別に対応する Base Attack を返す。
+##
+## [param t_spin] に応じて参照する表を切り替える。
+func get_base_attack(clear_type: LineClear.Type, t_spin: TSpinDetector.Result) -> int:
+	match t_spin:
+		TSpinDetector.Result.FULL:
+			return _lookup(t_spin_attack_table, clear_type)
+		TSpinDetector.Result.MINI:
+			return _lookup(t_spin_mini_attack_table, clear_type)
+	return _lookup(line_attack_table, clear_type)
+
+
+## Perfect Clear の Attack を返す。
+func get_perfect_clear_attack(clear_type: LineClear.Type) -> int:
+	return _lookup(perfect_clear_attack_table, clear_type)
+
+
 ## Combo 段数に対応する Attack 加算値を返す。
 ##
 ## [param combo_count] は連続 Line Clear 数（1 回目の Clear なら 1）。
@@ -51,3 +90,10 @@ func get_combo_attack(combo_count: int) -> int:
 
 	var index: int = mini(combo_count - 1, combo_attack_table.size() - 1)
 	return combo_attack_table[index]
+
+
+# 表から Clear 種別の値を引く。表が短い場合は 0 を返す。
+static func _lookup(table: PackedInt32Array, clear_type: LineClear.Type) -> int:
+	if clear_type < 0 or clear_type >= table.size():
+		return 0
+	return table[clear_type]

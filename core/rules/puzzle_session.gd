@@ -25,6 +25,12 @@ signal piece_held(held_type: int)
 ## T-Spin と判定された（[enum TSpinDetector.Result]）。
 signal t_spin_detected(result: int)
 
+## Perfect Clear が成立した。
+signal perfect_clear_achieved
+
+## Attack が発生した。送り先の決定は Battle Layer の責務（Phase 4）。
+signal attack_generated(amount: int, context: AttackContext)
+
 ## Top Out した（Spawn できなかった）。
 signal topped_out
 
@@ -39,12 +45,14 @@ var _drop: DropSystem
 var _auto_shift: AutoShift
 var _lock_delay: LockDelay
 var _scoring: ScoringState
+var _attack_calculator: AttackCalculator
 var _t_spin_detector: TSpinDetector
 var _last_action_was_rotation: bool = false
 var _last_kick_index: int = -1
 var _last_kick_table_size: int = 0
 var _is_over: bool = false
 var _cleared_lines_total: int = 0
+var _last_attack: int = 0
 
 
 func _init(
@@ -61,6 +69,7 @@ func _init(
 	_auto_shift = AutoShift.new(_rules)
 	_lock_delay = LockDelay.new(_rules)
 	_scoring = ScoringState.new(_balance)
+	_attack_calculator = AttackCalculator.new(_balance)
 	_t_spin_detector = TSpinDetector.new()
 
 
@@ -74,6 +83,7 @@ func start(game_seed: int = 0) -> void:
 	_scoring.reset()
 	_is_over = false
 	_cleared_lines_total = 0
+	_last_attack = 0
 	_spawn_next()
 
 
@@ -203,6 +213,11 @@ func get_cleared_lines_total() -> int:
 	return _cleared_lines_total
 
 
+## 直前の Lock で発生した Attack を返す。
+func get_last_attack() -> int:
+	return _last_attack
+
+
 ## Combo / Back-to-Back / 直前の T-Spin をまとめた状態を返す。
 ##
 ## Attack 計算（#30）はこれをそのまま入力にする。
@@ -299,6 +314,16 @@ func _lock_piece() -> void:
 	if result.has_cleared():
 		_cleared_lines_total += result.line_count
 		lines_cleared.emit(result)
+
+		var is_perfect_clear: bool = PerfectClear.is_achieved(_board, result.line_count)
+		if is_perfect_clear:
+			perfect_clear_achieved.emit()
+
+		var context: AttackContext = AttackContext.create(result, _scoring, is_perfect_clear)
+		var attack: int = _attack_calculator.calculate(context)
+		if attack > 0:
+			_last_attack = attack
+			attack_generated.emit(attack, context)
 
 	_hold.on_piece_locked()
 	_spawn_next()
