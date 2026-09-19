@@ -74,6 +74,48 @@ scripts/run-tests.sh -gunit_test_name=test_seeded_rng_is_reproducible
 
 テストの書き方と対象は [テストガイドライン.md](docs/テストガイドライン.md) を参照。
 
+## 品質チェック
+
+CI と同じ内容をローカルで実行できる。PR を出す前にこの 3 つを通す。
+
+```sh
+scripts/static-check.sh   # GDScript の Lint / フォーマット / 命名規約 / 依存方向
+scripts/verify-godot.sh   # import + 起動検証
+scripts/run-tests.sh      # 自動テスト
+```
+
+`scripts/static-check.sh` は gdtoolkit（gdlint / gdformat）を使う。未導入なら次で入れる。
+
+```sh
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r ci/requirements-static-check.txt
+```
+
+gdtoolkit を入れずに命名規約と依存方向だけ見たい場合は `SKIP_GDTOOLKIT=1` を付ける。
+`shellcheck` と `actionlint` は導入済みの場合だけ実行される。
+
+macOS Export の検証は Export Templates（約 1GB）の取得を伴うため、通常は CI に任せる。
+ローカルで確認する場合は次を実行する。
+
+```sh
+scripts/export-macos.sh   # build/Project99.zip を生成して検証する
+```
+
+## CI
+
+`.github/workflows/ci.yml` が PR と push で以下を実行する。Godot は `.godot-version` の
+バージョンを取得し、`ci/godot-checksums.txt` の SHA-512 で検証してから使う。
+
+| Job | Runner | 内容 |
+|---|---|---|
+| Static Check | ubuntu | `scripts/static-check.sh` |
+| Import / 起動検証 | ubuntu | `scripts/verify-godot.sh` |
+| Headless テスト | ubuntu | `scripts/run-tests.sh` |
+| macOS Export Validation | macOS | `scripts/export-macos.sh` |
+| CI ステータス確認 | ubuntu | 上記すべての成否を集約（branch protection はこれを required にする） |
+
+実機が必要な Controller Test と Performance Test は自動化せず、Release 前の手動検証として扱う。
+
 ## ディレクトリ構成
 
 [要件定義.md](docs/要件定義.md) §119 に従う。
