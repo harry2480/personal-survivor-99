@@ -51,6 +51,17 @@ extends Resource
 ## Garbage が適用されてからこの時間以内に Top Out したら、その攻撃者の KO とする。
 @export_range(0.0, 30.0, 0.5, "or_greater") var ko_attribution_window_sec: float = 5.0
 
+## KO 1 回で得る Attack Points（要件定義 §57）。
+@export_range(0, 20, 1, "or_greater") var ko_attack_points: int = 1
+
+## Multiplier Stage へ上がるのに必要な Attack Points（要件定義 §57）。
+##
+## index が Stage。Stage 0 の閾値は 0 で、以降は昇順に並べる。
+@export var multiplier_thresholds: PackedInt32Array = PackedInt32Array([0, 2, 4, 7, 10])
+
+## Multiplier Stage ごとの Attack 倍率（要件定義 §57）。
+@export var multiplier_values: PackedFloat32Array = PackedFloat32Array([1.0, 1.25, 1.5, 1.75, 2.0])
+
 ## Combo 段数ごとの Attack 加算値。
 ##
 ## index は「連続 Line Clear 数 - 1」。1 回目の Clear は Combo 0 として index 0 を見る。
@@ -90,6 +101,27 @@ func get_base_attack(clear_type: LineClear.Type, t_spin: TSpinDetector.Result) -
 ## Perfect Clear の Attack を返す。
 func get_perfect_clear_attack(clear_type: LineClear.Type) -> int:
 	return _lookup(perfect_clear_attack_table, clear_type)
+
+
+## Multiplier Stage の最大値を返す（要件定義 §57 の Stage 0〜4）。
+func get_max_multiplier_stage() -> int:
+	return maxi(0, mini(multiplier_thresholds.size(), multiplier_values.size()) - 1)
+
+
+## Attack Points に対応する Multiplier Stage を返す。
+func get_multiplier_stage(attack_points: int) -> int:
+	var stage: int = 0
+	for index in range(multiplier_thresholds.size()):
+		if attack_points >= multiplier_thresholds[index]:
+			stage = index
+	return mini(stage, get_max_multiplier_stage())
+
+
+## Multiplier Stage に対応する Attack 倍率を返す。
+func get_multiplier_value(stage: int) -> float:
+	if multiplier_values.is_empty():
+		return 1.0
+	return multiplier_values[clampi(stage, 0, multiplier_values.size() - 1)]
 
 
 ## Combo 段数に対応する Attack 加算値を返す。

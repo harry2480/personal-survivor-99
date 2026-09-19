@@ -32,11 +32,21 @@ run_godot_step "Import" "$GODOT_DIAGNOSTICS_ERROR" "$godot_bin" --headless --imp
 
 echo "==> GUT 実行"
 status=0
-"$godot_bin" --headless -s res://addons/gut/gut_cmdln.gd "$@" || status=$?
+output="$("$godot_bin" --headless -s res://addons/gut/gut_cmdln.gd "$@" 2>&1)" || status=$?
+printf '%s\n' "$output"
 
 if [ "$status" -ne 0 ]; then
   echo "テストが失敗しました (exit=$status)" >&2
   exit "$status"
+fi
+
+# RefCounted 同士が signal で参照し合うと循環して解放されない。Godot は終了時に
+# これを報告するが、終了コードには表れないため出力を走査する。
+# 99 人戦（Phase 7）と連戦のリーク検証（Phase 10 / #56）の前提になる。
+if printf '%s\n' "$output" | grep -q "resources still in use at exit"; then
+  printf '%s\n' "$output" | grep "resources still in use at exit" >&2
+  echo "解放されていないオブジェクトがあります。signal の購読を解除してください。" >&2
+  exit 1
 fi
 
 echo "--> テスト: OK"
