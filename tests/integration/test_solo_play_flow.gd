@@ -133,16 +133,16 @@ func test_combo_ends_on_a_clearless_lock_but_b2b_survives() -> void:
 	_tap_move(session, AutoShift.Direction.LEFT, Board.WIDTH)
 	session.hard_drop()
 
-	assert_eq(session.get_combo_count(), 1, "1 回目の Clear で Combo 1")
-	assert_gt(session.get_b2b_chain(), 0, "B2B の鎖が始まる")
+	assert_eq(session.get_scoring().get_combo_count(), 1, "1 回目の Clear で Combo 1")
+	assert_gt(session.get_scoring().get_b2b_chain(), 0, "B2B の鎖が始まる")
 
-	var combo_before: int = session.get_combo_count()
-	var chain_before: int = session.get_b2b_chain()
+	var combo_before: int = session.get_scoring().get_combo_count()
+	var chain_before: int = session.get_scoring().get_b2b_chain()
 
 	# 次の Piece を右端へ落とす。行は揃わない。
 	_tap_move(session, AutoShift.Direction.RIGHT, Board.WIDTH)
 	session.hard_drop()
 
-	assert_eq(session.get_combo_count(), 0, "Line Clear なしの Lock で Combo は終了する")
-	assert_eq(session.get_b2b_chain(), chain_before, "B2B は維持される")
+	assert_eq(session.get_scoring().get_combo_count(), 0, "Line Clear なしの Lock で Combo は終了する")
+	assert_eq(session.get_scoring().get_b2b_chain(), chain_before, "B2B は維持される")
 	assert_gt(combo_before, 0, "前提: Combo が立っていた")
