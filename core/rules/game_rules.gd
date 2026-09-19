@@ -23,6 +23,20 @@ const ACCUMULATION_EPSILON: float = 0.000001
 ## 1 秒あたりに落下するマス数。
 @export_range(0.0, 60.0, 0.01, "or_greater") var gravity_cells_per_second: float = 1.0
 
+## Soft Drop 中の落下速度倍率（要件定義 §27）。
+@export_range(1.0, 100.0, 0.5, "or_greater") var soft_drop_multiplier: float = 20.0
+
+## Hard Drop 直後に Lock するか（要件定義 §28）。
+@export var hard_drop_locks_immediately: bool = true
+
+## 横移動の長押しで、反復が始まるまでの時間（秒）。DAS（要件定義 §31）。
+@export_range(0.0, 1.0, 0.001, "or_greater") var das_sec: float = 0.167
+
+## 横移動の反復間隔（秒）。ARR（要件定義 §31）。
+##
+## 0 にすると、DAS 経過後は壁まで一気に移動する。
+@export_range(0.0, 0.5, 0.001, "or_greater") var arr_sec: float = 0.033
+
 ## 接地してから Lock するまでの時間（秒）。
 @export_range(0.0, 5.0, 0.01, "or_greater") var lock_delay_sec: float = 0.5
 
@@ -50,3 +64,43 @@ static func create_default() -> GameRules:
 ## Reset 回数に上限があるかを返す。
 func has_reset_limit() -> bool:
 	return lock_delay_reset_limit >= 0
+
+
+## Soft Drop 中の落下速度（1 秒あたりのマス数）を返す。
+func get_soft_drop_speed() -> float:
+	return gravity_cells_per_second * soft_drop_multiplier
+
+
+## ユーザー設定で上書きする（要件定義 §97）。
+##
+## 対象は操作感に関わる値だけ。知らないキーは無視し、不正な値は採用しない。
+## Game Core は FileSystem を知らないため（§17）、設定の読み込みは上位層が行い、
+## ここには [Dictionary] として渡す。
+##
+## 上書きできたキーの数を返す。
+func apply_user_settings(settings: Dictionary) -> int:
+	var applied: int = 0
+
+	if _is_positive_number(settings.get("soft_drop_multiplier")):
+		soft_drop_multiplier = float(settings["soft_drop_multiplier"])
+		applied += 1
+	if _is_non_negative_number(settings.get("das_sec")):
+		das_sec = float(settings["das_sec"])
+		applied += 1
+	if _is_non_negative_number(settings.get("arr_sec")):
+		arr_sec = float(settings["arr_sec"])
+		applied += 1
+
+	return applied
+
+
+static func _is_positive_number(value: Variant) -> bool:
+	return _is_number(value) and float(value) > 0.0
+
+
+static func _is_non_negative_number(value: Variant) -> bool:
+	return _is_number(value) and float(value) >= 0.0
+
+
+static func _is_number(value: Variant) -> bool:
+	return typeof(value) == TYPE_FLOAT or typeof(value) == TYPE_INT
