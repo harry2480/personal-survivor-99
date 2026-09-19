@@ -1,15 +1,3 @@
 {
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pnpm lint:fix 2>&1 | head -30"
-          }
-        ]
-      }
-    ]
-  }
+  "hooks": {}
 }

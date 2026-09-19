@@ -1,27 +1,35 @@
-# Product Starter
+# Project 99
+
+macOS（Apple Silicon）向けの 99 人対戦型 落ちものパズルゲーム。Godot 4 / GDScript。
 
 ## 使い方（利用者向け）
 
-- `pnpm dev` で開発サーバーを起動
-- `pnpm verify` で品質チェック（変更後に実行）
+- エディタで開く: `/Applications/Godot.app/Contents/MacOS/Godot --editor --path .`
+- 変更後の確認: `/Applications/Godot.app/Contents/MacOS/Godot --headless --import` と `--headless --quit-after 30`
 - 機能を追加したいときは Claude Code に「〇〇な機能を作って」と指示するだけでOK
-- テーブルを追加したいときは「〇〇テーブルを追加して」と指示
-- UIを作りたいときは「〇〇な画面を作って」と指示
+- 画面を作りたいときは「〇〇な画面を作って」と指示
 - エラーが出たらエラーメッセージを貼り付けて「直して」と指示
 
 ### コマンド一覧
 
 ```sh
-pnpm dev               # 開発サーバー起動
-pnpm verify            # lint → prisma generate → typecheck → unit test → depcruise
-pnpm test:unit         # Unit テスト
-pnpm test:integration  # Integration テスト（要 DATABASE_URL, INTEGRATION_TEST=true）
-pnpm lint:fix          # 自動フォーマット
-pnpm db:migrate        # DBマイグレーション作成・適用
-pnpm knip              # 未使用コード検出
-scripts/loop-once.sh   # Loopを1回だけ実行
-scripts/loop.sh        # 最大5回までLoopを反復（LOOP_MAX_ITERATIONSで調整）
+# エディタ起動
+/Applications/Godot.app/Contents/MacOS/Godot --editor --path .
+
+# import 検証（CI と同じ）
+/Applications/Godot.app/Contents/MacOS/Godot --headless --import
+
+# 起動検証（CI と同じ）
+/Applications/Godot.app/Contents/MacOS/Godot --headless --quit-after 30
+
+scripts/setup-loop-labels.sh   # Loop 用ラベルの作成・更新
+scripts/loop-once.sh           # Loopを1回だけ実行
+scripts/loop.sh                # 最大5回までLoopを反復（LOOP_MAX_ITERATIONSで調整）
+bash scripts/merge-pr.sh       # PR マージ + ブランチ整理
 ```
+
+自動テスト（GUT）はまだ導入していない。導入は #18 で行う。
+Static Check と macOS Export Validation を含む本番 CI の構築は #19 で行う。
 
 Loopを使う場合は [docs/loop-engineering.md](docs/loop-engineering.md) の初期設定、Issue信頼境界、auto-merge条件に従う。Loop関連コマンドは `.claude/commands/loop-*.md` に定義する。
 
@@ -29,70 +37,101 @@ Loopを使う場合は [docs/loop-engineering.md](docs/loop-engineering.md) の�
 
 ## Claude Code への指示（利用者は読まなくてOK）
 
+### 一次情報
+
+判断に迷ったら [docs/要件定義.md](docs/要件定義.md)（全144節）を読むこと。このファイルと docs が食い違う場合は要件定義を優先する。
+開発の順序は [docs/実装計画.md](docs/実装計画.md) の Phase 0〜10 に従い、先のフェーズの作業を前倒ししない。
+
 ### アーキテクチャ
 
-pnpm workspace monorepo。`apps/webapp/` に Next.js 15 App Router アプリ。
-
-バックエンド (`src/backend/`) は DDD 4層構造:
+Godot 4 プロジェクト。3層構造で、依存方向を逆転させない（要件定義 §16〜§19）。
 
 ```
-依存方向: presentation → application → domain ← infrastructure
+Presentation Layer  →  Battle Layer  →  Game Core Layer
 ```
 
-- **domain** — ビジネスルール。外部依存なし。最内層
-- **application** — UseCase。domain のみ依存（infrastructure 直接参照禁止、Gateway interface 経由）
-- **infrastructure** — Gateway/Repository 実装。domain の interface を implements
-- **presentation** — composition（唯一の DI ポイント、全層参照可）、loaders（読み取り）、actions（副作用）
+- **Game Core (`core/`)** — Board / Piece / Rotation / Collision / Gravity / Lock / Hold / Line Clear / Combo / B2B / T-Spin / Perfect Clear / Attack / Garbage。可能な限り決定論的な状態遷移として実装する
+- **Battle (`battle/`)** — BattlePlayer / Targeting / Garbage Routing / KO / Ranking / Attack Multiplier / Battle Phase
+- **Presentation (`scenes/`, `ui/`, `audio/`)** — Player Board / Opponent Grid / HUD / Menu / Settings / Result / Effects / Audio
+- **CPU (`cpu/`)** — Board Evaluation / Placement Search / Strength / Detailed・Lightweight Simulation
+- **Input (`input/`)** — Input Action → Game Command の抽象化
+
+**Game Core が知ってはいけないもの**: UI / Audio / Controller / Scene / Animation / File System / Opponent Grid。
+**UI から Game Core の内部状態を直接変更しない。**
 
 ### ファイル配置ルール
 
+要件定義 §119 に従う。
+
 ```
-src/backend/
-├── domain/
-│   ├── models/          # ドメインモデル (.model.ts)
-│   ├── services/        # ドメインサービス (.service.ts)
-│   ├── gateways/        # Gateway interface (.gateway.ts)
-│   └── repositories/    # Repository interface (.repository.ts)
-├── application/
-│   └── usecases/        # UseCase (.usecase.ts)
-├── infrastructure/
-│   ├── adapters/        # Gateway 実装 (.adapter.ts) — 本番 + Stub
-│   ├── repositories/    # Repository 実装 (.repository.ts)
-│   └── db/              # DB接続 (prisma-client.ts)
-└── presentation/
-    ├── composition/     # DI組み立て (.composition.ts)
-    ├── loaders/         # データ取得 (.loader.ts)
-    └── actions/         # 副作用 (.action.ts, 'use server')
+core/
+├── board/      # Board、Line Clear
+├── piece/      # Piece 定義、7-Bag、NEXT、Hold
+├── rotation/   # SRS Rotation、Wall Kick、Collision
+├── scoring/    # Combo、B2B、Score
+├── attack/     # Attack Calculator
+├── garbage/    # Garbage Event / Queue / Hole / Cancellation
+└── rules/      # Gravity、Lock Delay、DAS/ARR、T-Spin 判定
+battle/         # battle_manager.gd, battle_player_state.gd, target_manager.gd,
+                # garbage_router.gd, ko_system.gd, ranking_system.gd, multiplier_system.gd
+cpu/            # cpu_manager.gd, cpu_profile.gd, cpu_strength.gd, board_evaluator.gd,
+                # placement_search.gd, detailed_cpu.gd, lightweight_cpu.gd
+input/          # input_manager.gd, keyboard.gd, gamepad.gd
+scenes/         # boot/ main_menu/ battle/ settings/ result/ + scene_router.gd, game_state.gd
+ui/             # board/ opponent/ hud/ menu/ components/
+audio/          # audio_manager.gd, music_manager.gd
+config/         # game_rules.tres, game_balance.tres, cpu_profiles.tres, defaults.json
+tests/          # core/ battle/ cpu/ integration/（ソース構造を mirror）
 ```
 
 ### Key Rules
 
-- ファイル命名: kebab-case + レイヤーサフィックス
-- Rich Domain Model 必須。バリデーション・生成はモデル自身のメソッドで行う
-- サービス（UseCase, Domain Service）はクラスベース + コンストラクタ DI。関数エクスポート禁止
-- Domain 層のエラーは `Result<T, E>` 型で返す。Application/Infrastructure は throw
-- 外部 API の Gateway は必ず Stub 実装を用意し、Composition で環境変数に応じて切り替え
-- `index.ts` バレルエクスポート禁止
-- API Route 原則不使用（loaders + Server Actions パターン）
-- Server Component デフォルト。`'use client'` は必要な場合のみ
+- ファイル・ディレクトリ命名は snake_case。クラス名は PascalCase
+- 数値をコードへ固定しない。Gravity / Lock Delay / DAS / ARR / Attack / Combo Table / CPU Parameters はすべて `config/` のデータで定義する（要件定義 §38・§39）
+- 時間に関わる処理は時間ベースで実装する。FPS 依存にしない（Gravity / Lock Delay / DAS / ARR / Reaction Time）
+- 乱数は Seed 指定で再現できるようにする。グローバルな乱数状態に依存しない（要件定義 §110）
+- Game Core は決定論的に保つ。将来の Replay（Seed + Input Sequence）の前提になる（要件定義 §111）
+- ゲームロジックで物理ボタン番号を扱わない。Input Action → Game Command を経由する（要件定義 §11）
+- Danger 判定など、Battle Layer が持つべき判定を UI 側で独自に行わない
+- Scene 遷移と Game State は `scenes/scene_router.gd`（Autoload `SceneRouter`）に集約する
+- 負荷が高い場合の優先順位: `Human Input > Game Core > Battle State > Rendering > CPU Search Depth > Visual Effects`（要件定義 §84）
 
 ### テスト
 
-- Unit: domain + application（Gateway はモック、外部依存なし）
-- Integration: infrastructure（`INTEGRATION_TEST=true` + `DATABASE_URL` が未設定ならスキップ）
-- テストパス: `test/unit/`, `test/integration/`（ソース構造を mirror）
+- `tests/core/`, `tests/battle/`, `tests/cpu/` — Unit テスト（外部依存なし、Seed 固定）
+- `tests/integration/` — Battle 完走などの統合テスト
+- すべて `godot --headless` で実行できること
+- 実機が必要な Controller Test と Performance Test は自動化せず、Release 前の手動検証として扱う
+
+テストフレームワーク（GUT）の導入は #18 で行う。それまでは検証手順を PR に記載する。
 
 ### 品質チェック
 
-`pnpm verify` は lint → prisma generate → typecheck → unit test → depcruise を順に実行する。
-コード変更後は必ず `pnpm verify` を実行して全パスすることを確認する。
+コード変更後は最低限これを実行して、エラーが出ないことを確認する。
+
+```sh
+/Applications/Godot.app/Contents/MacOS/Godot --headless --import
+/Applications/Godot.app/Contents/MacOS/Godot --headless --quit-after 30
+```
+
+Static Check・自動テスト・macOS Export Validation を含む完全な CI は #19 で構築する。
+
+### Git
+
+- default branch は `main`。`main` への直接 commit / push は禁止（要件定義 §120）
+- ブランチは `feature/*` `fix/*` `refactor/*` `perf/*` `chore/*`
+- Commit prefix は `feat:` `fix:` `refactor:` `perf:` `test:` `docs:` `chore:`（要件定義 §121）
 
 ### 詳細ルール
 
 詳細な設計ルールは必要に応じて docs/ を読むこと:
 
-- docs/アーキテクチャ.md — DDD 4層・依存ルール・命名規約
-- docs/フロントエンド規約.md — フロントエンドのデータフローとUI規約
-- docs/インフラストラクチャ規約.md — monorepo・デプロイ・DB・Stub パターン
-- docs/品質チェック・テスト規約.md — テスト方針・verify コマンド
+- docs/要件定義.md — 全144節の一次情報
+- docs/実装計画.md — Phase 0〜10・MVP 受入条件・主要リスク
+- docs/アーキテクチャ.md — 3層構造・依存ルール・命名規約
+- docs/フロントエンドアーキテクチャ.md — Presentation Layer のデータフローとUI規約
+- docs/インフラストラクチャ規約.md — ビルド・配布・CI
+- docs/品質チェック・テスト規約.md — 品質ゲートの定義
+- docs/テストガイドライン.md — テスト方針と手動検証手順
+- docs/スタイルガイド.md — 表記・UI の統一ルール
 - docs/loop-engineering.md — Loop運用と安全境界

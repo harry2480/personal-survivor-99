@@ -1,0 +1,28 @@
+; Engine configuration file.
+; プロジェクト設定。詳細な設計方針は docs/要件定義.md を参照する。
+
+config_version=5
+
+[application]
+
+config/name="Project 99"
+config/description="99人対戦型落ちものパズル（macOS / Apple Silicon）"
+config/version="0.1.0"
+run/main_scene="res://scenes/boot/boot.tscn"
+config/features=PackedStringArray("4.7", "Mobile")
+config/icon="res://icon.svg"
+
+[autoload]
+
+SceneRouter="*res://scenes/scene_router.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=800
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+renderer/rendering_method="mobile"

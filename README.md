@@ -1,124 +1,100 @@
-# スターターテンプレート
+# Project 99
 
-Claude Code や GitHub Copilot などの AI エージェントへの指示だけで高品質なプロダクトを構築できるスターターキットです。
-また、本リポジトリは**プロジェクト横断で利用可能なドキュメントテンプレート**や**AIエージェント向けの共通スキル・コマンド**を集約するハブとしても機能しています。
+macOS（Apple Silicon）向けの 99 人対戦型 落ちものパズルゲーム。Godot 4 / GDScript で開発する。
 
-## ハーネスエンジニアリングとは
+- 1 人の Human と 98 体の CPU が同時に対戦し、最後の 1 人になるまで戦う
+- オフライン専用。サーバーもアカウントも不要
+- CPU の強さを広い範囲で変更でき、標準最高難易度を超える設定も可能
 
-このスターターキットは、**ハーネスエンジニアリング**の考え方に基づいて設計されています。
+詳細は [docs/要件定義.md](docs/要件定義.md) と [docs/サービスコンセプト.md](docs/サービスコンセプト.md) を参照。
 
-ハーネスエンジニアリングとは、AIエージェントが正しく力を発揮できるように情報やルールを整えることを指します。`CLAUDE.md` による共通ルールの注入、Skills（スラッシュコマンド）による定型作業の標準化、dependency-cruiser による依存方向の機械的な検証など、**複数のガードレールを多重に敷くことで、AIが書くコードの品質を構造的に担保**します。
+## 必要なもの
 
-これにより、AIエージェントを複数セッション並列で回しても、設計が崩れにくい開発が可能になります。
-
-詳しい背景と実践事例については、以下の記事をご覧ください。
-
-### このスターターキットに組み込まれたガードレール
-
-| ガードレール | 仕組み |
+| 項目 | バージョン |
 |---|---|
-| **設計ルールの注入** | `CLAUDE.md` や `docs/templates/` 配下にアーキテクチャ・命名規約・依存ルールを明文化し、AIにコンテキストを供給 |
-| **共通Skillsとプロンプト** | `.claude/skills/` や `.claude/commands/` にプロジェクト横断の定型作業コマンドを集約し、品質のばらつきを抑制 |
-| **依存方向の機械的検証** | dependency-cruiser で「domain は外部に依存しない」等のルールを CI で自動チェック |
-| **レイヤー別テスト戦略** | domain/application は Unit テスト、infrastructure は Integration テスト。テスト方針もドキュメント化 |
-| **統合CI/CD** | `.github/workflows/` に集約されたワークフローにより、型チェックやlint、テストを一元的に自動化 |
+| Godot Engine | `.godot-version` に記載（現在 4.7.2-stable） |
+| OS | macOS / Apple Silicon |
 
-## テンプレートとドキュメント管理
+Godot のバージョンは `.godot-version` を唯一の参照元とする。CI もこの値との一致を検証する。
+無計画なマイナーバージョン変更は行わない（[要件定義.md](docs/要件定義.md) §7）。
 
-本リポジトリの `docs/` には、新しいプロジェクトを立ち上げる際や新しい機能を設計する際にそのまま使える汎用テンプレートが用意されています。
-AIに「`docs/` の〇〇を使って新しい機能の要件定義をして」と指示するだけで、ベストプラクティスに基づいた仕様書が生成されます。
+### Godot の導入
 
-**収録テンプレートの例:**
-- アーキテクチャ設計規約
-- フロントエンド規約
-- スタイルガイド
-- 品質チェック・テスト規約
-- 実装計画（プロジェクト設計時のチェックリスト）
-- AIチャット機能要件定義
-- AIエージェント運用ガイド
-
-## 技術スタック (標準構成)
-
-- Next.js 15 (App Router) + Vercel
-- Supabase PostgreSQL + Prisma
-- shadcn/ui + Tailwind CSS
-- vitest + dependency-cruiser
-- Biome (lint/format)
-- AIツール: Vercel AI SDK, Streamdown
-
-## はじめかた
-
-### セットアップ
-
-AIエージェント（Claude Code 等）を開き、`/init-pj` を実行してください。前提ツールのインストールからDB構築まで自動で行います。
-
-## 使い方
-
-AIに自然言語で指示するだけで、テンプレートやルールに沿った機能追加が可能です。
-
-Issueから実装・修復・PRまでを反復するLoop Engineeringを使う場合は、[運用ガイド](docs/loop-engineering.md)に従ってGitHub側のラベルと保護設定を用意してください。Loopは任意で、通常の開発フローにも引き続き利用できます。
-
-**コマンド例:**
-```
-「ユーザー管理機能を作って」
-「お気に入り機能を追加して」
-「/articles ページを作って」
-「○○テーブルにstatusカラムを追加して」
-「このエラーを直して: [エラーメッセージ]」
+```sh
+brew install --cask godot
+/Applications/Godot.app/Contents/MacOS/Godot --version   # .godot-version と一致することを確認
 ```
 
-## 開発コマンド一覧
+バージョンを確実に合わせたい場合は、[GitHub Releases](https://github.com/godotengine/godot/releases) から
+`Godot_v<version>_macos.universal.zip` を取得する。
 
-| コマンド | 内容 |
-|---|---|
-| `pnpm dev` | 開発サーバー起動 |
-| `pnpm verify` | 品質チェック（lint → typecheck → test → depcruise） |
-| `pnpm test:unit` | Unit テスト実行 |
-| `pnpm lint:fix` | 自動フォーマット・Lint適用 |
-| `pnpm db:migrate` | DBマイグレーション |
-| `pnpm merge [PR]` | PR マージ＋ブランチ削除・リモート追跡ブランチ削除を自動化 |
-| `pnpm knip` | 未使用コード検出 |
+## 起動
 
-### PR マージワークフロー
+```sh
+# エディタで開く
+/Applications/Godot.app/Contents/MacOS/Godot --editor --path .
 
-`pnpm merge` コマンドで PR マージからブランチクリーンアップまでを一括実行できます：
+# ヘッドレスで import 検証
+/Applications/Godot.app/Contents/MacOS/Godot --headless --import
 
-```bash
-# 現在のブランチの PR をマージ
-pnpm merge
-
-# 指定した PR をマージ
-pnpm merge 42
-
-# PR URL でマージ
-pnpm merge https://github.com/owner/repo/pull/42
+# ヘッドレスで起動検証
+/Applications/Godot.app/Contents/MacOS/Godot --headless --quit-after 30
 ```
 
-このコマンドは Claude Code でも Codex などの他のエディタでも使用でき、PR マージ時の手作業を削減できます。
+`godot` をパスに通しておくと `godot --editor` のように短く書ける。
 
-## プロジェクト構成
+## ディレクトリ構成
+
+[要件定義.md](docs/要件定義.md) §119 に従う。
 
 ```text
-starter-templete/
-├── .claude/                # プロジェクト横断のAI SkillsとCommands
-├── .github/workflows/      # 統合CI/CDワークフロー（型チェック、ビルド、テスト等）
-├── docs/                   # プロジェクト横断で使えるドキュメント・定義テンプレート
-└── apps/webapp/src/        # メインアプリケーション
-    ├── app/                # ページ（Next.js App Router）
-    ├── backend/            # バックエンド全体
-    │   ├── application/    # ユースケース
-    │   ├── domain/         # ビジネスルール（モデル、インターフェース）
-    │   ├── infrastructure/ # DB・外部API実装
-    │   └── presentation/   # DI組み立て、データ取得、Server Actions
-    ├── frontend/           # フロントエンド・UI全体
-    └── lib/                # 共有ライブラリ
+project.godot
+├── assets/     # フォント・画像・音源・テーマ
+├── core/       # Game Core Layer（Board / Piece / Rotation / Scoring / Attack / Garbage / Rules）
+├── battle/     # Battle Layer（BattlePlayer / Target / Garbage Routing / KO / Rank / Multiplier）
+├── cpu/        # CPU AI（評価・探索・Strength・Detailed / Lightweight）
+├── input/      # Input Action → Game Command の抽象化
+├── scenes/     # Boot / MainMenu / Battle / Settings / Result
+├── ui/         # Presentation Layer のビュー
+├── audio/      # Audio / BGM 管理
+├── config/     # ゲームバランスと既定設定のデータ
+├── tests/      # 自動テスト（core / battle / cpu / integration）
+└── docs/       # 要件定義・設計ドキュメント
 ```
 
-## サンプル実装について
+依存方向は `Presentation → Battle → Game Core` で、逆転させない。
+Game Core は UI / Audio / Controller / Scene / FileSystem を知らない（[要件定義.md](docs/要件定義.md) §16〜§19）。
 
-初期状態では Claude API を使ったジョーク生成機能がサンプルとして含まれています。
-`ANTHROPIC_API_KEY` を設定すると API 経由で動作し、未設定の場合は Stub（固定値）で動作します。
+## 開発の進め方
 
-```bash
-echo 'ANTHROPIC_API_KEY="your-api-key"' >> apps/webapp/.env.local
+開発は [docs/実装計画.md](docs/実装計画.md) の Phase 0〜10 の順に進める。各 Phase は GitHub Issue に分割済み。
+
+Issue から実装・修復・PR までを反復する Loop Engineering を使う場合は、
+[docs/loop-engineering.md](docs/loop-engineering.md) のラベル運用と安全境界に従う。
+
+```sh
+scripts/setup-loop-labels.sh   # Loop 用ラベルの作成・更新
+scripts/loop-once.sh           # Loop を1回だけ実行
+scripts/loop.sh                # 最大5回まで反復
+bash scripts/merge-pr.sh       # PR マージ + ブランチ整理
 ```
+
+`main` への直接 push は禁止。変更は feature / fix / refactor / perf / chore ブランチから PR を出す
+（[要件定義.md](docs/要件定義.md) §120・§121）。
+
+## ドキュメント
+
+| ファイル | 内容 |
+|---|---|
+| [要件定義.md](docs/要件定義.md) | 全 144 節の完全要件定義。すべての判断の一次情報 |
+| [実装計画.md](docs/実装計画.md) | Phase 0〜10 の開発計画と MVP 受入条件 |
+| [アーキテクチャ.md](docs/アーキテクチャ.md) | 3 層構造・依存ルール・命名規約 |
+| [テストガイドライン.md](docs/テストガイドライン.md) | 自動テストと手動検証の方針 |
+| [品質チェック・テスト規約.md](docs/品質チェック・テスト規約.md) | 品質ゲートの定義 |
+| [インフラストラクチャ規約.md](docs/インフラストラクチャ規約.md) | ビルド・配布・CI |
+| [スタイルガイド.md](docs/スタイルガイド.md) | 表記・UI の統一ルール |
+| [loop-engineering.md](docs/loop-engineering.md) | Loop 運用と安全境界 |
+
+## ライセンス
+
+[LICENSE](LICENSE) を参照。
