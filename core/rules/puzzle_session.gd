@@ -26,6 +26,7 @@ signal piece_held(held_type: int)
 signal topped_out
 
 var _rules: GameRules
+var _balance: GameBalance
 var _board: Board
 var _piece: ActivePiece
 var _next_queue: NextQueue
@@ -34,12 +35,17 @@ var _rotation: RotationSystem
 var _drop: DropSystem
 var _auto_shift: AutoShift
 var _lock_delay: LockDelay
+var _combo: ComboState
+var _b2b: BackToBackState
 var _is_over: bool = false
 var _cleared_lines_total: int = 0
 
 
-func _init(rules: GameRules = null, randomizer: PieceRandomizer = null) -> void:
+func _init(
+	rules: GameRules = null, randomizer: PieceRandomizer = null, balance: GameBalance = null
+) -> void:
 	_rules = rules if rules != null else GameRules.create_default()
+	_balance = balance if balance != null else GameBalance.create_default()
 	_board = Board.new()
 	_piece = ActivePiece.new()
 	_next_queue = NextQueue.new(randomizer)
@@ -48,6 +54,8 @@ func _init(rules: GameRules = null, randomizer: PieceRandomizer = null) -> void:
 	_drop = DropSystem.new(_rules)
 	_auto_shift = AutoShift.new(_rules)
 	_lock_delay = LockDelay.new(_rules)
+	_combo = ComboState.new()
+	_b2b = BackToBackState.new(_balance)
 
 
 ## 新しいゲームを始める。Seed を指定すると Piece 列が再現できる。
@@ -57,6 +65,8 @@ func start(game_seed: int = 0) -> void:
 	_hold.clear()
 	_auto_shift.release_all()
 	_drop.set_soft_dropping(false)
+	_combo.reset()
+	_b2b.reset()
 	_is_over = false
 	_cleared_lines_total = 0
 	_spawn_next()
@@ -177,6 +187,21 @@ func get_cleared_lines_total() -> int:
 	return _cleared_lines_total
 
 
+## 現在の連続 Line Clear 数を返す（要件定義 §34）。
+func get_combo_count() -> int:
+	return _combo.get_count()
+
+
+## 現在の Back-to-Back の鎖の長さを返す（要件定義 §35）。
+func get_b2b_chain() -> int:
+	return _b2b.get_chain()
+
+
+## Back-to-Back の効果が乗る状態かを返す。
+func is_b2b_active() -> bool:
+	return _b2b.is_active()
+
+
 # --- 内部 ------------------------------------------------------------------
 
 
@@ -228,6 +253,11 @@ func _lock_piece() -> void:
 	piece_locked.emit(locked_type)
 
 	var result: LineClearResult = LineClear.execute(_board)
+
+	# Combo は Line Clear なしの Lock で終了するが、B2B は維持される（§34 / §35）。
+	_combo.on_piece_locked(result.line_count)
+	_b2b.on_piece_locked(result.type, result.line_count)
+
 	if result.has_cleared():
 		_cleared_lines_total += result.line_count
 		lines_cleared.emit(result)
