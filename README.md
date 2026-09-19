@@ -163,11 +163,13 @@ bash scripts/merge-pr.sh       # PR マージ + ブランチ整理
 | [要件定義.md](docs/要件定義.md) | 全 144 節の完全要件定義。すべての判断の一次情報 |
 | [実装計画.md](docs/実装計画.md) | Phase 0〜10 の開発計画と MVP 受入条件 |
 | [アーキテクチャ.md](docs/アーキテクチャ.md) | 3 層構造・依存ルール・命名規約 |
+| [コーディング規約.md](docs/コーディング規約.md) | GDScript の命名・型・Signal・Commit Convention |
 | [テストガイドライン.md](docs/テストガイドライン.md) | 自動テストと手動検証の方針 |
 | [品質チェック・テスト規約.md](docs/品質チェック・テスト規約.md) | 品質ゲートの定義 |
 | [インフラストラクチャ規約.md](docs/インフラストラクチャ規約.md) | ビルド・配布・CI |
 | [スタイルガイド.md](docs/スタイルガイド.md) | 表記・UI の統一ルール |
 | [loop-engineering.md](docs/loop-engineering.md) | Loop 運用と安全境界 |
+| [リポジトリ設定手順.md](docs/リポジトリ設定手順.md) | ブランチ保護 / auto-merge の適用手順（管理者作業） |
 
 ## ライセンス
 

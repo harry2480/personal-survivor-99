@@ -25,6 +25,8 @@ GitHub の Issue labels に次のラベルを作成します。
 
 本リポジトリのdefault branchは `main` です（[要件定義.md](要件定義.md) §120）。`main` のRulesetまたはbranch protectionで `.github/workflows/ci.yml` の集約jobをrequiredにします。このテンプレートではGitHub上のcheck名が `CI ステータス確認`、job IDが `ci-status` です。通常PRにも同じゲートを適用してください。直接pushとforce pushは禁止し、必要な場合のみ管理者bypassを限定します。
 
+具体的な適用コマンドと現在の設定状況は [リポジトリ設定手順.md](リポジトリ設定手順.md) にまとめています。
+
 GitHubの **Allow auto-merge** を有効化し、Squash mergeを許可してください。テンプレートはGitHub側の設定を変更しません。CI成功、CodeRabbit完了、未解決レビューなし、競合なし、human/blocked状態でないことをLoopが確認してから `gh pr merge --auto --squash` を要求します。required checksと保護ルールはGitHub側で維持します。
 
 ## Issue作成と粒度
