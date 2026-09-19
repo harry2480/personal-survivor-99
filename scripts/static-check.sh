@@ -51,9 +51,27 @@ elif [ "$gd_file_count" -eq 0 ]; then
 elif ! command -v gdlint >/dev/null 2>&1 || ! command -v gdformat >/dev/null 2>&1; then
   fail "gdtoolkit が見つかりません。pip install -r ci/requirements-static-check.txt を実行してください。"
 else
-  echo "==> gdlint"
-  # shellcheck disable=SC2086
-  gdlint $gd_files || fail "gdlint で問題が見つかりました"
+  # gdlint は実行時のカレントディレクトリから上へ設定ファイルを探す。
+  # tests/ には tests/gdlintrc（テスト向けに緩めた設定）があるため、
+  # 製品コードとテストコードを分けて実行する。
+  local_files="$(printf '%s\n' "$gd_files" | grep -v '^tests/' || true)"
+  test_files="$(printf '%s\n' "$gd_files" | grep '^tests/' | sed 's|^tests/||' || true)"
+
+  echo "==> gdlint（製品コード）"
+  if [ -n "$local_files" ]; then
+    # shellcheck disable=SC2086
+    gdlint $local_files || fail "gdlint で問題が見つかりました（製品コード）"
+  else
+    echo "対象なし"
+  fi
+
+  echo "==> gdlint（テスト）"
+  if [ -n "$test_files" ]; then
+    # shellcheck disable=SC2086
+    ( cd tests && gdlint $test_files ) || fail "gdlint で問題が見つかりました（テスト）"
+  else
+    echo "対象なし"
+  fi
 
   echo "==> gdformat --check"
   # shellcheck disable=SC2086
