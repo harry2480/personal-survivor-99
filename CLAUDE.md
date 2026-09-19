@@ -128,6 +128,8 @@ CI も同じスクリプトを使う。
 - default branch は `main`。`main` への直接 commit / push は禁止（要件定義 §120）
 - ブランチは `feature/*` `fix/*` `refactor/*` `perf/*` `chore/*`
 - Commit prefix は `feat:` `fix:` `refactor:` `perf:` `test:` `docs:` `chore:`（要件定義 §121）
+- 命名・型・Signal・commit の書き方の詳細は docs/コーディング規約.md
+- リポジトリ設定（ブランチ保護 / auto-merge / secret）は変更しない。手順は docs/リポジトリ設定手順.md に記載し、適用は管理者が行う
 
 ### 詳細ルール
 
@@ -136,9 +138,11 @@ CI も同じスクリプトを使う。
 - docs/要件定義.md — 全144節の一次情報
 - docs/実装計画.md — Phase 0〜10・MVP 受入条件・主要リスク
 - docs/アーキテクチャ.md — 3層構造・依存ルール・命名規約
+- docs/コーディング規約.md — GDScript の命名・型・Signal・ファイル分割・Commit Convention
 - docs/フロントエンドアーキテクチャ.md — Presentation Layer のデータフローとUI規約
 - docs/インフラストラクチャ規約.md — ビルド・配布・CI
 - docs/品質チェック・テスト規約.md — 品質ゲートの定義
 - docs/テストガイドライン.md — テスト方針と手動検証手順
 - docs/スタイルガイド.md — 表記・UI の統一ルール
 - docs/loop-engineering.md — Loop運用と安全境界
+- docs/リポジトリ設定手順.md — ブランチ保護 / auto-merge（管理者作業。AI は変更しない）
