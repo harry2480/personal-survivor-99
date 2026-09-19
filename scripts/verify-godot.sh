@@ -44,7 +44,8 @@ fi
 echo "Godot: $actual"
 echo
 
-# Godot の出力を走査し、エラー行があれば失敗させる。
+# Godot の出力を走査し、エラーまたは警告の行があれば失敗させる。
+# #16 の完了条件が「Import エラー・警告が出ない」ため、警告も失敗として扱う。
 run_step() {
   local label="$1"
   shift
@@ -60,8 +61,11 @@ run_step() {
     return 1
   fi
 
-  if printf '%s\n' "$output" | grep -qE '^(SCRIPT )?ERROR'; then
-    echo "$label でエラーが出力されました" >&2
+  local diagnostics
+  diagnostics="$(printf '%s\n' "$output" | grep -E '^(SCRIPT )?(ERROR|WARNING)' || true)"
+  if [ -n "$diagnostics" ]; then
+    echo "$label でエラーまたは警告が出力されました:" >&2
+    printf '%s\n' "$diagnostics" >&2
     return 1
   fi
 

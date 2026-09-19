@@ -40,15 +40,33 @@ func change_state(next_state: GameState.State) -> void:
 	if path == _current_scene_path:
 		return
 
+	var previous_scene_path: String = _current_scene_path
 	_current_scene_path = path
 
 	# 呼び出し元の _ready() 中に切り替えると SceneTree が子の追加中で落ちるため、
 	# 実際の切り替えは常にフレーム終端まで遅延させる。
-	_change_scene.call_deferred(path)
+	_change_scene.call_deferred(path, next_state, previous, previous_scene_path)
 
 
-func _change_scene(path: String) -> void:
+## 遅延実行される実際の Scene 切り替え。失敗した場合は状態を呼び出し前へ戻す。
+func _change_scene(
+	path: String,
+	attempted_state: GameState.State,
+	previous_state: GameState.State,
+	previous_scene_path: String,
+) -> void:
 	var error: Error = get_tree().change_scene_to_file(path)
-	if error != OK:
-		_current_scene_path = ""
-		push_error("Scene の切り替えに失敗しました: %s (error=%d)" % [path, error])
+	if error == OK:
+		return
+
+	# 状態を戻さないと current_state だけが先に進み、同じ状態への再試行が
+	# change_state() 冒頭の同値判定で無視されて復帰できなくなる。
+	push_error("Scene の切り替えに失敗しました: %s (error=%d)" % [path, error])
+
+	# 遅延中に別の遷移が走っていた場合は、そちらを優先して巻き戻さない。
+	if current_state != attempted_state:
+		return
+
+	current_state = previous_state
+	_current_scene_path = previous_scene_path
+	state_changed.emit(attempted_state, previous_state)

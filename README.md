@@ -15,18 +15,26 @@ macOS（Apple Silicon）向けの 99 人対戦型 落ちものパズルゲーム
 | Godot Engine | `.godot-version` に記載（現在 4.7.2-stable） |
 | OS | macOS / Apple Silicon |
 
-Godot のバージョンは `.godot-version` を唯一の参照元とする。CI もこの値との一致を検証する。
+Godot のバージョンは `.godot-version` を唯一の参照元とする。CI はこのファイルを読んで
+同じバージョンを取得するため、バージョンを上げるときはこのファイルと
+[`ci/godot-checksums.txt`](ci/README.md) を更新すればよい。
 無計画なマイナーバージョン変更は行わない（[要件定義.md](docs/要件定義.md) §7）。
 
 ### Godot の導入
 
 ```sh
 brew install --cask godot
-/Applications/Godot.app/Contents/MacOS/Godot --version   # .godot-version と一致することを確認
+scripts/verify-godot.sh   # .godot-version と一致しない場合はここで失敗する
 ```
 
+`brew` の cask は常に最新版のため、`.godot-version` とずれることがある。
 バージョンを確実に合わせたい場合は、[GitHub Releases](https://github.com/godotengine/godot/releases) から
 `Godot_v<version>_macos.universal.zip` を取得する。
+取得したファイルは [`ci/godot-checksums.txt`](ci/README.md) の SHA-512 で検証できる。
+
+```sh
+shasum -a 512 -c --ignore-missing ci/godot-checksums.txt
+```
 
 ## 起動
 
