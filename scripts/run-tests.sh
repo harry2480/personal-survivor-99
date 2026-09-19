@@ -27,7 +27,8 @@ echo "Godot: $version"
 echo
 
 # import 済みでないと addons/gut のクラスが解決できないため、先に import を通す。
-"$godot_bin" --headless --import >/dev/null
+# Godot は import に失敗しても終了コード 0 を返すため、出力も走査する。
+run_godot_step "Import" "$GODOT_DIAGNOSTICS_ERROR" "$godot_bin" --headless --import
 
 echo "==> GUT 実行"
 status=0

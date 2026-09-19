@@ -11,6 +11,9 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
+# shellcheck source=lib/godot-env.sh
+. "$repo_root/scripts/lib/godot-env.sh"
+
 version="$(tr -d '[:space:]' < .godot-version)"
 if [ -z "$version" ]; then
   echo ".godot-version が空です" >&2
@@ -44,12 +47,7 @@ echo "Export Templates を取得します: $archive"
 curl -fsSL -o "$work/$archive" "$url"
 
 # HTTPS は経路しか守らないため、リポジトリに固定した公式 SHA-512 で中身を検証する。
-cp ci/godot-checksums.txt "$work/checksums.txt"
-if command -v sha512sum >/dev/null 2>&1; then
-  ( cd "$work" && sha512sum --check --ignore-missing checksums.txt )
-else
-  ( cd "$work" && shasum -a 512 --check --ignore-missing checksums.txt )
-fi
+verify_sha512 "$work/$archive" "$repo_root/ci/godot-checksums.txt"
 
 # tpz は zip。展開すると templates/ 配下にファイルが並ぶ。
 unzip -q "$work/$archive" -d "$work/extracted"

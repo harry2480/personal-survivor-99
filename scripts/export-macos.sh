@@ -38,7 +38,8 @@ if [ -e "$output" ]; then
 fi
 
 # Export は import 済みのプロジェクトを前提にする。
-"$godot_bin" --headless --import >/dev/null
+# Godot は import に失敗しても終了コード 0 を返すため、出力も走査する。
+run_godot_step "Import" "$GODOT_DIAGNOSTICS_ERROR" "$godot_bin" --headless --import
 
 echo "==> Export 検証（preset: ${preset} → ${output}）"
 status=0

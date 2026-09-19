@@ -42,6 +42,11 @@ runs:
         RUNNER_OS: ${{ runner.os }}
       run: |
         set -euo pipefail
+
+        # チェックサム検証はローカルの scripts/ と共有する。
+        # shellcheck source=/dev/null
+        . "${GITHUB_WORKSPACE}/scripts/lib/godot-env.sh"
+
         mkdir -p ~/godot
 
         case "$RUNNER_OS" in
@@ -67,13 +72,7 @@ runs:
           curl -fsSL -o "${work}/${archive}.zip" "$url"
 
           # HTTPS は経路しか守らないため、リポジトリに固定した公式 SHA-512 で中身を検証する。
-          cp "${GITHUB_WORKSPACE}/ci/godot-checksums.txt" "${work}/checksums.txt"
-          if command -v sha512sum >/dev/null 2>&1; then
-            ( cd "$work" && sha512sum --check --ignore-missing checksums.txt )
-          else
-            # macOS runner には sha512sum がない
-            ( cd "$work" && shasum -a 512 --check --ignore-missing checksums.txt )
-          fi
+          verify_sha512 "${work}/${archive}.zip" "${GITHUB_WORKSPACE}/ci/godot-checksums.txt"
 
           unzip -q "${work}/${archive}.zip" -d ~/godot
           if [ "$RUNNER_OS" = "Linux" ]; then
