@@ -5,8 +5,11 @@ extends Node
 ##
 ## Game Core（core/）はこの Node を参照しない。Scene 遷移は Presentation の責務とする。
 
+## 状態が変わった直後に発火する。実際の Scene 切り替えはこの後フレーム終端で行われる。
 signal state_changed(previous: GameState.State, current: GameState.State)
 
+## 状態に対応する Scene。ここに無い状態（LOADING / PAUSED / FINISHED）は
+## Scene を切り替えず、現在の Scene の上で扱う。
 const SCENE_PATHS: Dictionary = {
 	GameState.State.MAIN_MENU: "res://scenes/main_menu/main_menu.tscn",
 	GameState.State.PLAYING: "res://scenes/battle/battle.tscn",
@@ -14,6 +17,8 @@ const SCENE_PATHS: Dictionary = {
 }
 
 var current_state: GameState.State = GameState.State.BOOT
+
+var _current_scene_path: String = ""
 
 
 ## 状態を遷移させ、対応する Scene があれば切り替える。
@@ -28,12 +33,22 @@ func change_state(next_state: GameState.State) -> void:
 	if not SCENE_PATHS.has(next_state):
 		return
 
+	var path: String = SCENE_PATHS[next_state]
+
+	# 同じ Scene への遷移では読み込み直さない。
+	# これが無いと PLAYING → PAUSED → PLAYING で Battle が最初からやり直しになる。
+	if path == _current_scene_path:
+		return
+
+	_current_scene_path = path
+
 	# 呼び出し元の _ready() 中に切り替えると SceneTree が子の追加中で落ちるため、
 	# 実際の切り替えは常にフレーム終端まで遅延させる。
-	_change_scene.call_deferred(SCENE_PATHS[next_state])
+	_change_scene.call_deferred(path)
 
 
 func _change_scene(path: String) -> void:
 	var error: Error = get_tree().change_scene_to_file(path)
 	if error != OK:
+		_current_scene_path = ""
 		push_error("Scene の切り替えに失敗しました: %s (error=%d)" % [path, error])

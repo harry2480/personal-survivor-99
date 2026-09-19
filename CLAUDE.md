@@ -5,7 +5,7 @@ macOS（Apple Silicon）向けの 99 人対戦型 落ちものパズルゲーム
 ## 使い方（利用者向け）
 
 - エディタで開く: `/Applications/Godot.app/Contents/MacOS/Godot --editor --path .`
-- 変更後の確認: `/Applications/Godot.app/Contents/MacOS/Godot --headless --import` と `--headless --quit-after 30`
+- 変更後の確認: `scripts/verify-godot.sh`
 - 機能を追加したいときは Claude Code に「〇〇な機能を作って」と指示するだけでOK
 - 画面を作りたいときは「〇〇な画面を作って」と指示
 - エラーが出たらエラーメッセージを貼り付けて「直して」と指示
@@ -16,12 +16,7 @@ macOS（Apple Silicon）向けの 99 人対戦型 落ちものパズルゲーム
 # エディタ起動
 /Applications/Godot.app/Contents/MacOS/Godot --editor --path .
 
-# import 検証（CI と同じ）
-/Applications/Godot.app/Contents/MacOS/Godot --headless --import
-
-# 起動検証（CI と同じ）
-/Applications/Godot.app/Contents/MacOS/Godot --headless --quit-after 30
-
+scripts/verify-godot.sh         # import + 起動検証（CI と同じ）
 scripts/setup-loop-labels.sh   # Loop 用ラベルの作成・更新
 scripts/loop-once.sh           # Loopを1回だけ実行
 scripts/loop.sh                # 最大5回までLoopを反復（LOOP_MAX_ITERATIONSで調整）
@@ -110,9 +105,11 @@ tests/          # core/ battle/ cpu/ integration/（ソース構造を mirror）
 コード変更後は最低限これを実行して、エラーが出ないことを確認する。
 
 ```sh
-/Applications/Godot.app/Contents/MacOS/Godot --headless --import
-/Applications/Godot.app/Contents/MacOS/Godot --headless --quit-after 30
+scripts/verify-godot.sh
 ```
+
+Godot はスクリプトエラーが出ても終了コード 0 を返すため、終了コードだけで成否を判断しない。
+`scripts/verify-godot.sh` は出力に `ERROR` / `SCRIPT ERROR` があれば失敗する。CI も同じスクリプトを使う。
 
 Static Check・自動テスト・macOS Export Validation を含む完全な CI は #19 で構築する。
 

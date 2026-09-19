@@ -22,12 +22,28 @@ reviews:
     - path: "docs/**/*.md"
       instructions: |
         設計・開発ドキュメントについて、アーキテクチャとの整合性、責務分離、依存方向、ドメイン境界、実装可能性、既存リポジトリとの整合性を確認してください。曖昧または矛盾する要件があれば指摘してください。
-    - path: "apps/webapp/src/backend/**"
+    - path: "core/**"
       instructions: |
-        依存方向が presentation → application → domain ← infrastructure の順になっているか確認してください。データベースアクセスは infrastructure に置き、認可はサーバー側のaction/use-case経由で行ってください。
+        Game Core Layer です。UI / Audio / Controller / Scene / Animation / FileSystem に依存していないか確認してください（docs/要件定義.md §17）。
+        Gravity・Lock Delay・DAS・ARR などの時間処理が FPS 依存になっていないか、乱数が Seed 指定で再現できるか、状態遷移が決定論的かを確認してください。
+        Attack 値や Combo Table などのバランス数値がコードに直書きされていないか指摘してください（§38・§39）。
+    - path: "battle/**"
+      instructions: |
+        Battle Layer です。依存方向 Presentation → Battle → Game Core を逆転させていないか確認してください。
+        Target 処理では、自分を狙わない・Dead Player を狙わない・Target 消失で Crash しない・残り1人で停止・Invalid ID を安全に処理する、の5点を満たしているか確認してください（§53）。
+        Garbage は「生成 Attack → Incoming 相殺 → 余剰を Target へ送信」の順序を守っているか確認してください（§42）。
+    - path: "cpu/**"
+      instructions: |
+        98体が同時に動く前提で、1フレームあたりの計算量と割り当ての多さを確認してください。
+        CPU 思考負荷が Human Input を遅延させていないか（§84）、Strength からのパラメータ変換がデータ定義になっているかを確認してください。
+    - path: "ui/**"
+      instructions: |
+        Presentation Layer です。UI から Game Core の内部状態を直接変更していないか確認してください（§19）。
+        Danger 判定など Battle Layer が持つべき判定を UI 側で独自に行っていないか指摘してください（§92）。
     - path: ".github/workflows/**"
       instructions: |
         イベントの信頼境界、最小権限のtoken設定、jobがskipされた場合の挙動を確認してください。失敗が成功として扱われる経路があれば指摘してください。
+        Godot はスクリプトエラーでも終了コード0を返すため、終了コードだけで判定している箇所があれば指摘してください。
   path_filters:
     - "!**/*.mdx"
     - "!**/*.svg"
@@ -35,14 +51,16 @@ reviews:
     - "!**/*.jpg"
     - "!**/*.jpeg"
     - "!**/*.gif"
-    - "!**/*.lock"
-    - "!**/pnpm-lock.yaml"
-    - "!**/yarn.lock"
-    - "!**/package-lock.json"
-    - "!**/dist/**"
-    - "!**/.next/**"
-    - "!**/coverage/**"
-    - "!**/*.snap"
+    - "!**/*.ogg"
+    - "!**/*.wav"
+    - "!**/*.ttf"
+    - "!**/*.otf"
+    # Godot が自動生成するメタデータと、空ディレクトリ維持用のファイル
+    - "!**/*.uid"
+    - "!**/*.import"
+    - "!**/.gitkeep"
+    - "!.godot/**"
+    - "!**/export/**"
 knowledge_base:
   code_guidelines:
     enabled: true

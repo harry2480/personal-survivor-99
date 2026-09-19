@@ -51,13 +51,10 @@ jobs:
           fi
           "$HOME/godot/godot" --version
 
-      - name: Import 検証
-        run: |
-          "$HOME/godot/godot" --headless --import
-
-      - name: 起動検証
-        run: |
-          "$HOME/godot/godot" --headless --quit-after 30
+      # Godot はスクリプトエラーでも exit 0 を返すため、
+      # 出力を走査して失敗させるスクリプト経由で実行する。
+      - name: Import / 起動検証
+        run: GODOT_BIN="$HOME/godot/godot" scripts/verify-godot.sh
 
   ci-status:
     name: CI ステータス確認

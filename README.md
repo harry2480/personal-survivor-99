@@ -34,14 +34,18 @@ brew install --cask godot
 # エディタで開く
 /Applications/Godot.app/Contents/MacOS/Godot --editor --path .
 
-# ヘッドレスで import 検証
-/Applications/Godot.app/Contents/MacOS/Godot --headless --import
-
-# ヘッドレスで起動検証
-/Applications/Godot.app/Contents/MacOS/Godot --headless --quit-after 30
+# import + 起動を検証する（CI と同じ内容）
+scripts/verify-godot.sh
 ```
 
-`godot` をパスに通しておくと `godot --editor` のように短く書ける。
+`scripts/verify-godot.sh` は `.godot-version` との一致確認、import 検証、起動検証をまとめて行う。
+Godot はスクリプトエラーが出ても終了コード 0 を返すため、このスクリプトが出力を走査して失敗させる。
+
+`godot` をパスに通しておくと自動で見つかる。別の場所にある場合は `GODOT_BIN` で指定する。
+
+```sh
+GODOT_BIN=/path/to/godot scripts/verify-godot.sh
+```
 
 ## ディレクトリ構成
 
