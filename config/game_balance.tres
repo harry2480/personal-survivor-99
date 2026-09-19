@@ -13,4 +13,6 @@ t_spin_mini_attack_table = PackedInt32Array(0, 0, 1, 2, 4)
 b2b_bonus = 1
 perfect_clear_attack_table = PackedInt32Array(0, 10, 10, 10, 10)
 perfect_clear_replaces_attack = true
+garbage_delay_sec = 1.0
+garbage_hole_mode = 1
 combo_attack_table = PackedInt32Array(0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5)

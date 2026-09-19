@@ -142,7 +142,7 @@ func _on_topped_out() -> void:
 
 
 func _update_status(message: String) -> void:
-	var lines: int = _session.get_cleared_lines_total() if _session != null else 0
+	var lines: int = _session.get_scoring().get_cleared_lines_total() if _session != null else 0
 	_status_label.text = "Lines: %d    %s" % [lines, message]
 
 
@@ -199,11 +199,11 @@ func _draw_next() -> void:
 
 
 func _draw_hold() -> void:
-	var held: int = _session.get_held_type()
+	var held: int = _session.get_hold_slot().get_held_type()
 	if held == HoldSlot.EMPTY:
 		return
 	var color: Color = PIECE_COLORS[held]
-	if not _session.can_hold():
+	if not _session.get_hold_slot().can_hold():
 		color = color.darkened(0.5)
 	_draw_piece_preview(held, HOLD_ORIGIN, color)
 
