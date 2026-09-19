@@ -1,3 +1,23 @@
-[gd_resource type="Resource" format=3]
+[gd_resource type="Resource" script_class="CpuProfile" format=3]
+
+[ext_resource type="Script" path="res://cpu/cpu_profile.gd" id="1_cpu_profile"]
 
 [resource]
+resource_name = "CPU Profile (Default)"
+script = ExtResource("1_cpu_profile")
+profile_name = "Default"
+hole_avoidance = 1.0
+surface_management = 1.0
+garbage_management = 1.0
+recovery_ability = 1.0
+weight_aggregate_height = -0.51
+weight_max_height = -0.3
+weight_holes = -3.6
+weight_hole_depth = -0.4
+weight_bumpiness = -0.18
+weight_wells = -0.3
+weight_row_transitions = -0.2
+weight_column_transitions = -0.3
+weight_completed_lines = 1.6
+weight_blocked_garbage = -1.2
+weight_danger = -2.0
