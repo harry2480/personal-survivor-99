@@ -23,7 +23,7 @@ GitHub の Issue labels に次のラベルを作成します。
 
 ### GitHub設定
 
-Loopを有効にするリポジトリでは、default branchを `develop` に設定し、`develop` のRulesetまたはbranch protectionで `.github/workflows/ci.yml` の集約jobをrequiredにします。このテンプレートではGitHub上のcheck名が `CI ステータス確認`、job IDが `ci-status` です。通常PRにも同じゲートを適用してください。直接pushとforce pushは禁止し、必要な場合のみ管理者bypassを限定します。
+Loopを有効にするリポジトリでは、default branchを `develop` に設定し、`develop` のRulesetまたはbranch protectionで `.github/workflows/ci.yml` の集約jobをrequiredにします。なお [要件定義.md](要件定義.md) §120 はMain Branchを `main` と定めており、現在のdefault branch `develop` と食い違っています。どちらに統一するかをPhase 0で決定し、本書と [インフラストラクチャ規約.md](インフラストラクチャ規約.md) を揃えてください。このテンプレートではGitHub上のcheck名が `CI ステータス確認`、job IDが `ci-status` です。通常PRにも同じゲートを適用してください。直接pushとforce pushは禁止し、必要な場合のみ管理者bypassを限定します。
 
 GitHubの **Allow auto-merge** を有効化し、Squash mergeを許可してください。テンプレートはGitHub側の設定を変更しません。CI成功、CodeRabbit完了、未解決レビューなし、競合なし、human/blocked状態でないことをLoopが確認してから `gh pr merge --auto --squash` を要求します。required checksと保護ルールはGitHub側で維持します。
 
@@ -44,7 +44,7 @@ Dependabotのワークフローはpatch/minor更新だけに自動マージを�
 - `/loop-fix-ci [PR番号]`: PRに起因するCI失敗だけを修正
 - `/loop-fix-main <障害>`: 人の依頼で障害修正PRを準備。直接pushは禁止
 
-ローカルでは認証済み `gh` と Claude Code CLI が必要です。
+ローカルでは認証済み `gh` と Claude Code CLI、および固定バージョンの Godot 4 が必要です。
 
 ```sh
 scripts/loop-once.sh
@@ -82,12 +82,12 @@ PRは専用feature branchから作り、`develop` や `main` に直接commit/pus
 
 ## `/init-pj` との関係
 
-`/init-pj` で新しいプロジェクトを設定するとき、Loopを使うか確認します。使う場合は実際のdefault branch、monorepo構成、package manager、CIコマンド、ドキュメントの場所に合わせてworkflowとCodeRabbit設定を調整し、不要なE2EやDB設定を外します。使わない場合はLoop workflow/ラベルを無効にして通常PRフローを残します。初期状態でLoopのGitHub自動処理を有効化しないでください。
+`/init-pj` で新しいプロジェクトを設定するとき、Loopを使うか確認します。使う場合は実際のdefault branch、プロジェクト構成、Godotのバージョン、CIコマンド、ドキュメントの場所に合わせてworkflowとCodeRabbit設定を調整し、本プロジェクトに存在しないDB・E2E・package manager前提の設定を外します。使わない場合はLoop workflow/ラベルを無効にして通常PRフローを残します。初期状態でLoopのGitHub自動処理を有効化しないでください。
 
 ## 動作確認
 
 GitHub Actions上で専用のテスト用リポジトリを使い、信頼できる作成者のready IssueからPR作成、CI失敗修正、CodeRabbit指摘修正、品質ゲート通過、squash自動マージまでを確認します。外部ユーザーのIssueにreadyを付けた場合は自動処理されずhumanへ移ること、CIや外部サービスが失敗した場合にLoopが停止すること、通常PRと手動レビューが維持されることも確認してください。
 
-CIでは使い捨てのPostgreSQL 16を起動し、migration適用後に `pnpm verify` と `pnpm build` を実行します。ローカルでビルドまで確認する場合は、破棄可能なDBを用意して `DATABASE_URL` と `DIRECT_URL` を設定してください。このテンプレートにはE2Eテスト環境がまだないため、`/init-pj` で対象プロジェクトのE2E構成を確認し、存在する場合だけ同じ集約checkに追加します。
+CIでは固定バージョンのGodot 4バイナリを取得し、Static Check・Import/起動検証・Headlessの自動テスト・macOS Export Validationを実行します。本プロジェクトにデータベースはないため、DB起動やmigrationの手順は不要です。詳細は [品質チェック・テスト規約.md](品質チェック・テスト規約.md) と [インフラストラクチャ規約.md](インフラストラクチャ規約.md) を参照してください。実機でのController TestとPerformance Testは自動化できないため、集約checkには含めずRelease前の手動検証として扱います。
 
-ローカルではshell構文、workflow構文、CodeRabbit YAML、Issue templateを検証し、`pnpm verify` を実行します。実際のCodeRabbitレビュー、GitHubのbranch protection、自動マージ、Issue作成からマージまでの一連の動作は外部設定に依存し、ローカル検証だけでは証明できません。
+ローカルではshell構文、workflow構文、CodeRabbit YAML、Issue templateを検証し、`godot --headless` による自動テストを実行します。実際のCodeRabbitレビュー、GitHubのbranch protection、自動マージ、Issue作成からマージまでの一連の動作は外部設定に依存し、ローカル検証だけでは証明できません。
