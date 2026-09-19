@@ -3,7 +3,8 @@
   "gameplay": {
     "das_sec": 0.167,
     "arr_sec": 0.033,
-    "soft_drop_multiplier": 20.0
+    "soft_drop_multiplier": 20.0,
+    "stick_dead_zone": 0.5
   },
   "audio": {},
   "video": {},

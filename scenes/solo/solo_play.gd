@@ -52,7 +52,10 @@ func _ready() -> void:
 	_status_label.position = Vector2(40, 40 + 20 * CELL_SIZE + 12)
 	add_child(_status_label)
 
-	_session = PuzzleSession.new(_load_rules())
+	var rules: GameRules = _load_rules()
+	InputManager.apply_dead_zone(rules.stick_dead_zone)
+
+	_session = PuzzleSession.new(rules)
 	_session.lines_cleared.connect(_on_lines_cleared)
 	_session.topped_out.connect(_on_topped_out)
 	_session.start(randi())

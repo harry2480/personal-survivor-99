@@ -40,6 +40,12 @@ const MINIMUM_SOFT_DROP_MULTIPLIER: float = 1.0
 ## 0 にすると、DAS 経過後は壁まで一気に移動する。
 @export_range(0.0, 0.5, 0.001, "or_greater") var arr_sec: float = 0.033
 
+## Stick 入力のしきい値（Dead Zone。要件定義 §14）。
+##
+## この値未満の傾きは入力として扱わない。Controller の個体差を吸収するため、
+## ユーザー設定で変更できる。
+@export_range(0.0, 0.9, 0.01) var stick_dead_zone: float = 0.5
+
 ## 接地してから Lock するまでの時間（秒）。
 @export_range(0.0, 5.0, 0.01, "or_greater") var lock_delay_sec: float = 0.5
 
@@ -95,6 +101,9 @@ func apply_user_settings(settings: Dictionary) -> int:
 	if _is_non_negative_number(settings.get("arr_sec")):
 		arr_sec = float(settings["arr_sec"])
 		applied += 1
+	if _is_dead_zone(settings.get("stick_dead_zone")):
+		stick_dead_zone = float(settings["stick_dead_zone"])
+		applied += 1
 
 	return applied
 
@@ -105,6 +114,10 @@ static func _is_number_at_least(value: Variant, minimum: float) -> bool:
 
 static func _is_non_negative_number(value: Variant) -> bool:
 	return _is_number(value) and float(value) >= 0.0
+
+
+static func _is_dead_zone(value: Variant) -> bool:
+	return _is_number(value) and float(value) >= 0.0 and float(value) < 1.0
 
 
 static func _is_number(value: Variant) -> bool:

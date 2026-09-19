@@ -93,6 +93,18 @@ Phase 1 の動作確認用に、単体プレイできる最小画面がありま
 | C | Hold |
 | Esc | Pause |
 
+Pro コントローラー（要件定義 §14）でも同じ操作ができます。
+
+| ボタン | 操作 |
+|---|---|
+| D-Pad ← → | 移動 |
+| D-Pad ↓ | Soft Drop |
+| D-Pad ↑ | Hard Drop |
+| A / B | 回転（時計回り / 反時計回り） |
+| L / R | Hold |
+| + | Pause |
+| Right Stick | Target 切り替え（Phase 4 で使用） |
+
 この画面（`scenes/solo/`）は動作確認専用で、本番の Battle UI は Phase 8 で作ります。
 
 ## 品質チェック
