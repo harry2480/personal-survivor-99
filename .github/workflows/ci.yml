@@ -1,8 +1,11 @@
 name: CI
 
+# PR は pull_request、main は push で検証する。
+# 両方を '**' にすると PR ブランチへの push で CI が二重に走り、
+# macOS runner の job が毎回 2 つ起動してしまう。
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
     branches: ['**']
 

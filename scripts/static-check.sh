@@ -8,6 +8,7 @@
 #   5. shellcheck — scripts/ 配下のシェルスクリプト（未導入なら省略）
 #   6. actionlint — GitHub Actions のワークフロー（未導入なら省略）
 #   7. 変数展開    — 全角文字の直前で波括弧を省略していないか（bash 3.2 対策）
+#   8. 設定ファイル — project.godot 等のコメントが ";" になっているか
 #
 # 1〜2 は gdtoolkit が必要。未導入なら次で入れる。
 #
@@ -126,6 +127,20 @@ bare_expansions="$(
 if [ -n "$bare_expansions" ]; then
   printf '%s\n' "$bare_expansions" >&2
   fail "全角文字の直前の変数展開は \${var} の形にしてください（bash 3.2 で unbound variable になります）"
+fi
+
+# ---- 8. 設定ファイルのコメント --------------------------------------------
+# Godot の設定ファイルのコメントは ";" 始まり。"#" で書くとその行以降の
+# セクションが黙って読み捨てられ、設定が効かないまま気づけない。
+echo '==> 設定ファイルのコメント（";" を使う）'
+hash_comments="$(
+  ls_files 'project.godot' 'export_presets.cfg' '*.tres' \
+    | grep -v '^addons/' \
+    | while IFS= read -r f; do grep -Hn '^[[:space:]]*#' "$f" || true; done
+)"
+if [ -n "$hash_comments" ]; then
+  printf '%s\n' "$hash_comments" >&2
+  fail 'Godot の設定ファイルのコメントは ";" で書いてください（"#" は後続行ごと無視されます）'
 fi
 
 # ---------------------------------------------------------------------------
