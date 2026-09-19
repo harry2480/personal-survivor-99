@@ -1,0 +1,3 @@
+# Static Check で使う GDScript の Linter / Formatter。
+# バージョンを固定して、CI とローカルで同じ結果になるようにする。
+gdtoolkit==4.5.0
