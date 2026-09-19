@@ -74,6 +74,27 @@ scripts/run-tests.sh -gunit_test_name=test_seeded_rng_is_reproducible
 
 テストの書き方と対象は [テストガイドライン.md](docs/テストガイドライン.md) を参照。
 
+## 遊んでみる（Phase 1）
+
+Phase 1 の動作確認用に、単体プレイできる最小画面があります。
+
+```sh
+/Applications/Godot.app/Contents/MacOS/Godot --path .
+```
+
+起動 → Enter / Space でプレイ開始。操作は要件定義 §15 の Keyboard Mapping です。
+
+| キー | 操作 |
+|---|---|
+| ← → | 移動（長押しで DAS / ARR） |
+| ↓ | Soft Drop |
+| Space | Hard Drop |
+| Z / X | 回転（反時計回り / 時計回り） |
+| C | Hold |
+| Esc | Pause |
+
+この画面（`scenes/solo/`）は動作確認専用で、本番の Battle UI は Phase 8 で作ります。
+
 ## 品質チェック
 
 CI と同じ内容をローカルで実行できる。PR を出す前にこの 3 つを通す。

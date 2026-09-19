@@ -12,7 +12,9 @@ signal state_changed(previous: GameState.State, current: GameState.State)
 ## Scene を切り替えず、現在の Scene の上で扱う。
 const SCENE_PATHS: Dictionary = {
 	GameState.State.MAIN_MENU: "res://scenes/main_menu/main_menu.tscn",
-	GameState.State.PLAYING: "res://scenes/battle/battle.tscn",
+	# Phase 1 の間は動作確認用の単体プレイ画面を使う。
+	# Battle Scene（scenes/battle/）へ戻すのは Phase 8（#48〜#50）。
+	GameState.State.PLAYING: "res://scenes/solo/solo_play.tscn",
 	GameState.State.RESULT: "res://scenes/result/result.tscn",
 }
 
