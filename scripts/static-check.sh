@@ -7,6 +7,7 @@
 #   4. 依存方向   — Presentation → Battle → Game Core を逆転させていないこと（§16〜§19）
 #   5. shellcheck — scripts/ 配下のシェルスクリプト（未導入なら省略）
 #   6. actionlint — GitHub Actions のワークフロー（未導入なら省略）
+#   7. 変数展開    — 全角文字の直前で波括弧を省略していないか（bash 3.2 対策）
 #
 # 1〜2 は gdtoolkit が必要。未導入なら次で入れる。
 #
@@ -112,6 +113,19 @@ if command -v actionlint >/dev/null 2>&1; then
   actionlint .github/workflows/*.yml || fail "actionlint で問題が見つかりました"
 else
   echo "==> actionlint: 未導入のため省略"
+fi
+
+# ---- 7. 変数展開 -----------------------------------------------------------
+# macOS の /bin/bash は 3.2 で、波括弧なしの変数展開の直後に全角文字が続くと、
+# マルチバイトの先頭バイトまで変数名として読み、unbound variable になる。
+# 本リポジトリはメッセージが日本語なので踏みやすい。${var} と書けば防げる。
+echo "==> 変数展開（全角文字の直前は \${var} を使う）"
+bare_expansions="$(
+  LC_ALL=C grep -nE '\$[A-Za-z_][A-Za-z0-9_]*[^ -~]' scripts/*.sh scripts/lib/*.sh || true
+)"
+if [ -n "$bare_expansions" ]; then
+  printf '%s\n' "$bare_expansions" >&2
+  fail "全角文字の直前の変数展開は \${var} の形にしてください（bash 3.2 で unbound variable になります）"
 fi
 
 # ---------------------------------------------------------------------------

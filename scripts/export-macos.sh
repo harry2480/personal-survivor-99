@@ -40,7 +40,7 @@ fi
 # Export は import 済みのプロジェクトを前提にする。
 "$godot_bin" --headless --import >/dev/null
 
-echo "==> Export 検証（preset: $preset → $output）"
+echo "==> Export 検証（preset: ${preset} → ${output}）"
 status=0
 export_log="$("$godot_bin" --headless --export-release "$preset" "$output" 2>&1)" || status=$?
 printf '%s\n' "$export_log"
