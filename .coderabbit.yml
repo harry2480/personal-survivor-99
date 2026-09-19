@@ -61,6 +61,8 @@ reviews:
     - "!**/.gitkeep"
     - "!.godot/**"
     - "!**/export/**"
+    # vendoring した上流コード（GUT）。自分で書いた差分ではないためレビュー対象外にする
+    - "!addons/gut/**"
 knowledge_base:
   code_guidelines:
     enabled: true
