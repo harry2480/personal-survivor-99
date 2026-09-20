@@ -52,6 +52,25 @@ func rotate(
 	return RotationResult.create_failure(origin, rotation)
 
 
+## 回転を試し、結果を [Vector3i] で返す（割り当てなし）。
+##
+## [code](x, y, 回転状態)[/code] を返す。失敗した場合は [code]z[/code] が -1。
+## CPU の配置探索（#39）が 1 手あたり数千回呼ぶため、[RotationResult] を作らずに
+## 済ませる入口を用意している。ゲーム側は [method rotate] を使う。
+func try_rotate(
+	board: Board, type: Piece.Type, rotation: Piece.Rotation, origin: Vector2i, direction: Direction
+) -> Vector3i:
+	var next_rotation: Piece.Rotation = get_next_rotation(rotation, direction)
+	var offsets: PackedVector2Array = get_kick_table(type).get_offsets(rotation, next_rotation)
+
+	for index in range(offsets.size()):
+		var candidate: Vector2i = origin + Vector2i(offsets[index])
+		if Collision.can_place(board, type, next_rotation, candidate):
+			return Vector3i(candidate.x, candidate.y, next_rotation)
+
+	return Vector3i(0, 0, -1)
+
+
 ## 時計回りに回す。
 func rotate_clockwise(
 	board: Board, type: Piece.Type, rotation: Piece.Rotation, origin: Vector2i

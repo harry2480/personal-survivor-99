@@ -6,6 +6,9 @@
 resource_name = "CPU Profile (Default)"
 script = ExtResource("1_cpu_profile")
 profile_name = "Default"
+placement_quality = 1.0
+beam_width = 8
+lookahead = 1
 hole_avoidance = 1.0
 surface_management = 1.0
 garbage_management = 1.0

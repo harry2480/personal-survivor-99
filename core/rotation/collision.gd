@@ -30,14 +30,10 @@ static func get_cells(
 static func can_place(
 	board: Board, type: Piece.Type, rotation: Piece.Rotation, origin: Vector2i
 ) -> bool:
+	# 盤外か既にブロックがあるかを 1 回で見る。1 手の探索で数万回走るため
+	# （#39 の計測）、ここでの呼び出し回数を抑えている。
 	for offset in Piece.get_cells(type, rotation):
-		var x: int = origin.x + offset.x
-		var y: int = origin.y + offset.y
-
-		# Board.get_cell() は範囲外を空として返すため、範囲判定は別に行う。
-		if not board.is_inside(x, y):
-			return false
-		if not board.is_cell_empty(x, y):
+		if not board.is_cell_free(origin.x + offset.x, origin.y + offset.y):
 			return false
 
 	return true

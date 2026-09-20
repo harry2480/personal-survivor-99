@@ -250,3 +250,62 @@ func test_same_operations_produce_same_board() -> void:
 func _fill_row(y: int) -> void:
 	for x in range(Board.WIDTH):
 		board.set_cell(x, y, 1)
+
+
+func test_clone_is_independent() -> void:
+	board.set_cell(5, 39, Piece.Type.T)
+
+	var copy: Board = board.clone()
+	copy.set_cell(6, 39, Piece.Type.I)
+
+	assert_eq(copy.get_cell(5, 39), Piece.Type.T as int, "内容が写る")
+	assert_true(board.is_cell_empty(6, 39), "写し先への書き込みが元へ漏れない")
+
+
+func test_copy_from_is_independent() -> void:
+	# 実体を共有したままにすると、写し先への書き込みが写し元まで変えてしまう。
+	var other := Board.new()
+
+	other.copy_from(board)
+	other.set_cell(0, 39, Piece.Type.T)
+
+	assert_true(board.is_cell_empty(0, 39), "写し元は変わらない")
+	assert_eq(other.get_cell(0, 39), Piece.Type.T as int, "写し先だけが変わる")
+
+
+func test_copy_from_replaces_the_previous_content() -> void:
+	var other := Board.new()
+	other.set_cell(3, 30, Piece.Type.S)
+	board.set_cell(7, 20, Piece.Type.Z)
+
+	other.copy_from(board)
+
+	assert_true(other.is_cell_empty(3, 30), "前の内容は消える")
+	assert_eq(other.get_cell(7, 20), Piece.Type.Z as int, "写した内容になる")
+
+
+func test_get_top_filled_y() -> void:
+	assert_eq(board.get_top_filled_y(), Board.TOTAL_HEIGHT, "空なら内部領域の高さ")
+
+	board.set_cell(4, 25, Piece.Type.I)
+
+	assert_eq(board.get_top_filled_y(), 25, "一番上のブロックの y")
+
+
+func test_is_cell_free_matches_inside_and_empty() -> void:
+	board.set_cell(4, 30, Piece.Type.T)
+
+	assert_true(board.is_cell_free(0, 0), "盤内で空なら true")
+	assert_false(board.is_cell_free(4, 30), "ブロックがあれば false")
+	assert_false(board.is_cell_free(-1, 0), "左壁の外は false")
+	assert_false(board.is_cell_free(Board.WIDTH, 0), "右壁の外は false")
+	assert_false(board.is_cell_free(0, -1), "上端の外は false")
+	assert_false(board.is_cell_free(0, Board.TOTAL_HEIGHT), "下端の外は false")
+
+	for y in range(Board.TOTAL_HEIGHT):
+		for x in range(Board.WIDTH):
+			assert_eq(
+				board.is_cell_free(x, y),
+				board.is_inside(x, y) and board.is_cell_empty(x, y),
+				"既存の判定と一致する"
+			)

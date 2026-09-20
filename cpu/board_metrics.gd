@@ -52,8 +52,15 @@ func _init() -> void:
 ## 盤面を測り直す。結果は各プロパティへ入る。
 func measure(board: Board) -> void:
 	_reset()
-	_measure_columns(board)
-	_measure_rows(board)
+
+	# 盤面の大半は空。走査を「一番上のブロック」から下だけに絞る。
+	# 99 体ぶんを繰り返し呼ぶため、ここの差が効く（#38 の制約）。
+	var top_y: int = board.get_top_filled_y()
+	if top_y >= Board.TOTAL_HEIGHT:
+		return
+
+	_measure_columns(board, top_y)
+	_measure_rows(board, top_y)
 	danger_ratio = DangerLevel.get_ratio(board)
 
 
@@ -76,14 +83,14 @@ func _reset() -> void:
 	danger_ratio = 0.0
 
 
-func _measure_columns(board: Board) -> void:
+func _measure_columns(board: Board, from_y: int) -> void:
 	for x in range(Board.WIDTH):
 		var top_y: int = Board.TOTAL_HEIGHT
 		var column_holes: int = 0
 		var column_hole_depth: int = 0
 		var previous_filled: bool = false  # 走査開始位置より上は空
 
-		for y in range(Board.TOTAL_HEIGHT):
+		for y in range(from_y, Board.TOTAL_HEIGHT):
 			var filled: bool = not board.is_cell_empty(x, y)
 			if filled and top_y == Board.TOTAL_HEIGHT:
 				top_y = y
@@ -119,8 +126,8 @@ func _measure_surface() -> void:
 			wells += depth
 
 
-func _measure_rows(board: Board) -> void:
-	for y in range(Board.TOTAL_HEIGHT):
+func _measure_rows(board: Board, from_y: int) -> void:
+	for y in range(from_y, Board.TOTAL_HEIGHT):
 		var filled_cells: int = 0
 		var previous_filled: bool = true  # 左右の壁は埋まり扱い
 		var has_garbage: bool = false

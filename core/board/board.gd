@@ -82,6 +82,17 @@ func is_cell_empty(x: int, y: int) -> bool:
 	return get_cell(x, y) == EMPTY
 
 
+## セルが盤内にあり、かつ空かを返す。
+##
+## [method is_inside] と [method is_cell_empty] を続けて呼ぶのと同じだが、
+## 呼び出しが 1 回で済む。衝突判定が 1 手の探索で数万回走るため（#39 の計測）、
+## ここの回数が効く。
+func is_cell_free(x: int, y: int) -> bool:
+	if x < 0 or x >= WIDTH or y < 0 or y >= TOTAL_HEIGHT:
+		return false
+	return _cells[y * WIDTH + x] == EMPTY
+
+
 ## 行がすべて埋まっているかを返す。範囲外の行は false。
 func is_row_filled(y: int) -> bool:
 	if y < 0 or y >= TOTAL_HEIGHT:
@@ -105,9 +116,11 @@ func is_row_empty(y: int) -> bool:
 
 
 ## 埋まっている行の y を、上から順（昇順）に返す。
+##
+## 盤面の大半は空なので、一番上のブロックから下だけを見る。
 func get_filled_rows() -> Array[int]:
 	var rows: Array[int] = []
-	for y in range(TOTAL_HEIGHT):
+	for y in range(get_top_filled_y(), TOTAL_HEIGHT):
 		if is_row_filled(y):
 			rows.append(y)
 	return rows
@@ -172,6 +185,38 @@ func to_strings(top_y: int, row_count: int) -> PackedStringArray:
 			row += EMPTY_CHAR if is_cell_empty(x, y) else FILLED_CHAR
 		rows.append(row)
 	return rows
+
+
+## 同じ内容の Board を作る。
+##
+## CPU の配置探索（#39）が、実際の盤面を壊さずに「置いたらどうなるか」を
+## 試すために使う。
+func clone() -> Board:
+	var copy := Board.new()
+	copy._cells = _cells.duplicate()
+	return copy
+
+
+## 別の Board の内容をこの Board へ写す。
+##
+## 探索中に Board を作り直さずに済ませるための入口。
+##
+## **必ず複製する。** 代入だけで済ませると、GDScript では配列の実体が共有された
+## まま要素を書き換えられてしまい、写し元の盤面まで変わる。
+func copy_from(other: Board) -> void:
+	_cells = other._cells.duplicate()
+
+
+## 一番上にあるブロックの y を返す。無ければ [constant TOTAL_HEIGHT]。
+##
+## 盤面の大半は空なので、走査の開始位置を絞るために使う。
+## 行ごとの関数呼び出しを避け、セル列を直接走る。
+func get_top_filled_y() -> int:
+	var size: int = _cells.size()
+	for index in range(size):
+		if _cells[index] != EMPTY:
+			return index / WIDTH
+	return TOTAL_HEIGHT
 
 
 ## 表示領域だけを文字列として取り出す。
