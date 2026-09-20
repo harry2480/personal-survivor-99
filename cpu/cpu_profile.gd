@@ -11,6 +11,9 @@ extends Resource
 ## 動かせば、個別の重みを触らずに「穴に厳しい CPU」「表面をきれいに保つ CPU」
 ## といった性格を作れる。
 
+## Beam Width の上限。Machine（要件定義 §71）はここまで広げる。
+const MAX_BEAM_WIDTH: int = 40
+
 ## Profile の名前。
 @export var profile_name: String = "Default"
 
@@ -25,7 +28,7 @@ extends Resource
 ##
 ## 到達できる配置は 40 前後あり、全部を深く読むと 1 手に数十 ms かかる
 ## （scripts/benchmark-cpu.sh の計測）。まず浅く並べ、上位だけを深く読む。
-@export_range(1, 40, 1) var beam_width: int = 8
+@export_range(1, MAX_BEAM_WIDTH, 1) var beam_width: int = 8
 
 ## NEXT を何手先まで見るか（要件定義 §64）。
 ##
