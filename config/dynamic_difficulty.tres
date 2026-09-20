@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="DynamicDifficulty" format=3]
+
+[ext_resource type="Script" path="res://cpu/dynamic_difficulty.gd" id="1_dynamic"]
+
+[resource]
+resource_name = "Dynamic Difficulty (OFF)"
+script = ExtResource("1_dynamic")
+enabled = false
+target_win_rate = 0.5
+max_step = 5.0
+minimum_strength = 30.0
+maximum_strength = 150.0

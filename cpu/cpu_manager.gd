@@ -43,11 +43,43 @@ func register(player_id: int, profile: CpuProfile) -> void:
 	_lightweight[player_id] = LightweightCpu.new(profile, _seed + player_id)
 
 
-## Battle の全 CPU を登録する。
+## Battle の全 CPU を同じ Strength で登録する。
 func register_all(mapping: CpuStrengthMapping, strength: float) -> void:
 	for player in _manager.get_players():
 		if player.player_type == PlayerType.Type.CPU:
 			register(player.player_id, mapping.create_profile(strength))
+
+
+## Battle の全 CPU を Strength の分布に従って登録する（要件定義 §73 / §74）。
+##
+## 同じ [param distribution_seed] からは同じ配り方になる（#44 の完了条件）。
+func register_all_from_distribution(
+	distribution: CpuDistribution, mapping: CpuStrengthMapping = null, distribution_seed: int = 0
+) -> void:
+	var cpu_ids: Array[int] = []
+	for player in _manager.get_players():
+		if player.player_type == PlayerType.Type.CPU:
+			cpu_ids.append(player.player_id)
+
+	var profiles: Array[CpuProfile] = distribution.create_profiles(
+		cpu_ids.size(), mapping, distribution_seed
+	)
+	for index in range(cpu_ids.size()):
+		register(cpu_ids[index], profiles[index])
+
+
+## 登録されている [CpuProfile] を返す。未登録なら [code]null[/code]。
+func get_profile(player_id: int) -> CpuProfile:
+	return _profiles.get(player_id, null)
+
+
+## その CPU が Top Out しているかを返す。方式によらず同じ口で答える。
+func is_over(player_id: int) -> bool:
+	if get_mode(player_id) == Mode.DETAILED:
+		return _detailed[player_id].is_over()
+	if _lightweight.has(player_id):
+		return _lightweight[player_id].is_over()
+	return false
 
 
 ## 同時に Detailed にできる数を設定する。

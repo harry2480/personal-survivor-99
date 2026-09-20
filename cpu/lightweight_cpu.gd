@@ -12,12 +12,20 @@ extends RefCounted
 ## 指標を更新する周期（秒）。
 const UPDATE_INTERVAL_SEC: float = 0.5
 
+## 腕前 1.0 の CPU が 1 秒あたりに掘れる行数。
+##
+## Attack（`pps × skill × 0.25`）より少し速い程度に置く。ここを大きくすると
+## 受けた Garbage をいくらでも掘り返せてしまい、**誰も脱落しない**（#44 で
+## CPU 同士の Battle が決着しなかった原因）。
+const DIG_LINES_PER_SECOND: float = 1.0
+
 var _profile: CpuProfile
 var _indicators: CpuIndicators = CpuIndicators.new()
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _timer_sec: float = 0.0
 var _pending_attack: float = 0.0
 var _pending_defense: float = 0.0
+var _pending_dig: float = 0.0
 var _update_count: int = 0
 
 
@@ -87,10 +95,11 @@ func _step_once() -> int:
 	_indicators.stack_height += _indicators.incoming_garbage
 	_indicators.incoming_garbage = 0
 
-	# 自分でも少しずつ掘る。腕前が高いほど下がる。
-	_indicators.stack_height = maxi(
-		0, _indicators.stack_height - int(round(_indicators.skill * 2.0))
-	)
+	# 自分でも少しずつ掘る。腕前が高いほど速い。端数は次の周期へ持ち越す。
+	_pending_dig += _indicators.skill * DIG_LINES_PER_SECOND * UPDATE_INTERVAL_SEC
+	var dug: int = int(_pending_dig)
+	_pending_dig -= float(dug)
+	_indicators.stack_height = maxi(0, _indicators.stack_height - dug)
 	_indicators.holes = maxi(0, _indicators.holes + (1 if _rng.randf() > _indicators.skill else -1))
 	_indicators.roughness = clampi(
 		_indicators.roughness + _rng.randi_range(-1, 1), 0, Board.VISIBLE_HEIGHT

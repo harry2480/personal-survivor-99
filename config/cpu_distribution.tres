@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CpuDistribution" format=3]
+
+[ext_resource type="Script" path="res://cpu/cpu_distribution.gd" id="1_distribution"]
+
+[resource]
+resource_name = "CPU Distribution (99 Player)"
+script = ExtResource("1_distribution")
+average_strength = 75.0
+minimum_strength = 45.0
+maximum_strength = 110.0
+strength_variance = 15.0
+fixed_strength_enabled = false
+fixed_strength = 100.0
+preset = 5
