@@ -7,6 +7,7 @@ CI では動かさない計測・検証用のスクリプト置き場。
 | `benchmark_cpu_search.gd` | CPU の配置探索にかかる時間を測る | `scripts/benchmark-cpu.sh` |
 | `benchmark_cpu_strength.gd` | Strength ごとの CPU の強さを測る | `scripts/benchmark-cpu-strength.sh` |
 | `benchmark_battle_scaling.gd` | Player 数ごとの Simulation 負荷を測る | `scripts/benchmark-battle-scaling.sh` |
+| `benchmark_cpu_scheduling.gd` | CPU 更新の分散の効き方を測る | `scripts/benchmark-cpu-scheduling.sh` |
 
 ## benchmark_cpu_search.gd
 
@@ -122,3 +123,36 @@ Lightweight Simulation（要件定義 §82）では、強い CPU ほど Garbage 
 
 Detailed Simulation では Misdrop（要件定義 §67）があるため決着する。
 Lightweight の近似精度を上げるかは Phase 10（#55）で判断する。
+
+## benchmark_cpu_scheduling.gd
+
+CPU 更新の分散（要件定義 §104）が 1 フレームのコストに効くかの計測（#47 の完了条件）。
+
+```sh
+scripts/benchmark-cpu-scheduling.sh
+```
+
+98 体の CPU を、分散なし（毎フレーム全員）と分散あり（組に分ける）で 1800 フレーム回す。
+
+### 計測結果（2026-09-22 / Apple Silicon / Godot 4.7.2 / CPU 98 体）
+
+| 分散 | 平均 (ms) | p99 (ms) | 1 フレームで動かす CPU |
+|---|---|---|---|
+| なし | 0.084 | 0.685 | 98 |
+| 2 分割 | 0.021 | 0.053 | 49 |
+| 4 分割 | 0.012 | 0.027 | 25 |
+| 8 分割 | 0.007 | 0.016 | 13 |
+
+**分散しても CPU の仕事の総量は変わらない。**効くのは重いフレームで、
+p99 が 0.685 ms → 0.016 ms（8 分割）まで下がる。Human Input は前のフレームの
+処理が終わるまで待つため、重いフレームが減るほど Input の待ちも短くなる
+（MVP 受入条件 29）。
+
+既定は 4 分割（`CpuSchedulePolicy.slice_count`）。Lightweight CPU では元々軽いので
+差は小さいが、Detailed CPU（1 手 6〜55 ms。`benchmark_cpu_search.gd` の計測）が
+混ざるほど効きが大きくなる。
+
+### 注意
+
+最初に測る行はプロセス起動直後の影響を受け、最大値が跳ねることがある。
+傾向は平均と p99 で見る。

@@ -20,8 +20,8 @@ var _pending_attack: float = 0.0
 var _pending_defense: float = 0.0
 var _pending_dig: float = 0.0
 var _update_count: int = 0
-var _last_cleared_garbage: int = 0
-var _last_applied_garbage: int = 0
+var _cleared_garbage: int = 0
+var _applied_garbage: int = 0
 
 
 func _init(profile: CpuProfile = null, cpu_seed: int = 0) -> void:
@@ -54,8 +54,6 @@ func get_update_count() -> int:
 ##
 ## 更新は [constant UPDATE_INTERVAL_SEC] ごと。間のフレームでは何もしない。
 func update(delta_sec: float) -> int:
-	_last_cleared_garbage = 0
-	_last_applied_garbage = 0
 	_timer_sec += maxf(0.0, delta_sec)
 	if _timer_sec + GameRules.ACCUMULATION_EPSILON < UPDATE_INTERVAL_SEC:
 		return 0
@@ -70,16 +68,23 @@ func update(delta_sec: float) -> int:
 	return attack
 
 
-## 直前の [method update] で、防御で捌いた Garbage 行数を返す。
-func get_last_cleared_garbage() -> int:
-	return _last_cleared_garbage
+## 前回取り出してから、防御で捌いた Garbage 行数を返して 0 に戻す。
+##
+## 更新を分散すると、あるフレームで更新されない CPU が出る（#47）。
+## 「直前の更新の値」にすると同じ行を何度も数えるので、取り出し式にする。
+func take_cleared_garbage() -> int:
+	var lines: int = _cleared_garbage
+	_cleared_garbage = 0
+	return lines
 
 
-## 直前の [method update] で、捌けずに盤面へ積んだ Garbage 行数を返す。
+## 前回取り出してから、捌けずに盤面へ積んだ Garbage 行数を返して 0 に戻す。
 ##
 ## KO の帰属は、この「実際に積んだ」行だけを対象にする（要件定義 §56）。
-func get_last_applied_garbage() -> int:
-	return _last_applied_garbage
+func take_applied_garbage() -> int:
+	var lines: int = _applied_garbage
+	_applied_garbage = 0
+	return lines
 
 
 ## Garbage を受け取る。
@@ -102,8 +107,8 @@ func _step_once() -> int:
 	_pending_defense = fmod(_pending_defense - float(cleared), 1.0)
 	_indicators.incoming_garbage -= cleared
 	_indicators.stack_height += _indicators.incoming_garbage
-	_last_cleared_garbage += cleared
-	_last_applied_garbage += _indicators.incoming_garbage
+	_cleared_garbage += cleared
+	_applied_garbage += _indicators.incoming_garbage
 	_indicators.incoming_garbage = 0
 
 	# 自分でも少しずつ掘る。腕前が高いほど速い。端数は次の周期へ持ち越す。

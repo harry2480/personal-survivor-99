@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CpuSchedulePolicy" format=3]
+
+[ext_resource type="Script" path="res://cpu/cpu_schedule_policy.gd" id="1_scheduling"]
+
+[resource]
+resource_name = "CPU Scheduling Policy"
+script = ExtResource("1_scheduling")
+slice_count = 4
+degrade_fps = 55.0
+restore_fps = 58.0
+sustained_frames = 30
+sample_frames = 30
+beam_scale = 0.25
+degraded_detailed_limit = 0
