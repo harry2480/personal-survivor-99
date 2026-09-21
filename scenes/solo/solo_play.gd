@@ -1,10 +1,10 @@
 extends Node2D
 
-## Phase 1 の動作確認用の最小画面。
+## Keyboard / Controller での単体プレイ画面。
 ##
-## 「Keyboard で通常 Puzzle として遊べる」ことを実際に確かめるためだけの画面で、
-## 本番の Battle UI（Phase 8 / #48〜#50）とは別物。Theme もアニメーションも使わず、
-## Board の状態をそのまま描くだけにしている。
+## 描画は Battle UI と同じ [PlayerBoardPanel]（#48）に任せ、この画面は
+## **入力と進行**だけを持つ。Phase 1 ではここに独自の描画を持っていたが、
+## 本番の Board View ができたので二重に持たない。
 ##
 ## Presentation Layer なので、Game Core の内部状態を直接書き換えない（要件定義 §19）。
 ## 操作は [InputManager] が返す [enum GameCommand.Command] だけを見る（§11）。
@@ -15,29 +15,16 @@ extends Node2D
 ## 受け続け、Pause 中や TOP OUT 後も Session を操作できてしまう。
 enum ScreenState { PLAYING, PAUSED, TOPPED_OUT }
 
-const CELL_SIZE: int = 24
-const BOARD_ORIGIN := Vector2(40, 40)
-const PREVIEW_ORIGIN := Vector2(40 + 10 * CELL_SIZE + 24, 40)
-const HOLD_ORIGIN := Vector2(40 + 10 * CELL_SIZE + 24, 40 + 9 * CELL_SIZE)
+## 画面の左上からの余白（ピクセル）。
+const MARGIN := Vector2(40, 40)
 
-const PIECE_COLORS: PackedColorArray = [
-	Color("00bcd4"),  # I
-	Color("3f51b5"),  # J
-	Color("ff9800"),  # L
-	Color("ffeb3b"),  # O
-	Color("4caf50"),  # S
-	Color("9c27b0"),  # T
-	Color("f44336"),  # Z
-]
-## Garbage の色。Piece の色と取り違えないよう、彩度のない灰にする。
-const GARBAGE_COLOR := Color("7a7f8c")
-const EMPTY_COLOR := Color("161821")
-const GRID_COLOR := Color("2a2d3a")
-const GHOST_ALPHA: float = 0.28
+## 配色の置き場所（要件定義 §38 / §119）。
+const PALETTE_PATH: String = "res://assets/themes/board_palette.tres"
 
 var _session: PuzzleSession
 var _input: InputManager
 var _status_label: Label
+var _board_panel: PlayerBoardPanel
 var _state: ScreenState = ScreenState.PLAYING
 
 
@@ -48,10 +35,6 @@ func _ready() -> void:
 	_input.command_pressed.connect(_on_command_pressed)
 	_input.command_released.connect(_on_command_released)
 
-	_status_label = Label.new()
-	_status_label.position = Vector2(40, 40 + 20 * CELL_SIZE + 12)
-	add_child(_status_label)
-
 	var rules: GameRules = _load_rules()
 	InputManager.apply_dead_zone(InputManager.DEFAULT_DEAD_ZONE)
 
@@ -60,6 +43,22 @@ func _ready() -> void:
 	_session.topped_out.connect(_on_topped_out)
 	_session.start(randi())
 
+	_board_panel = PlayerBoardPanel.new()
+	_board_panel.name = "PlayerBoardPanel"
+	_board_panel.position = MARGIN
+	add_child(_board_panel)
+	var palette: Resource = load(PALETTE_PATH)
+	if palette is BoardPalette:
+		_board_panel.set_palette(palette)
+	# Battle がいないので Danger は盤面から求める（Board View 側の分岐）。
+	_board_panel.bind(_session, null)
+
+	_status_label = Label.new()
+	_status_label.position = (
+		MARGIN + Vector2(0.0, float(Board.VISIBLE_HEIGHT * PlayerBoardView.CELL_SIZE) + 32.0)
+	)
+	add_child(_status_label)
+
 	_update_status("")
 
 
@@ -67,15 +66,6 @@ func _process(delta: float) -> void:
 	if _state != ScreenState.PLAYING:
 		return
 	_session.update(delta)
-	queue_redraw()
-
-
-func _draw() -> void:
-	_draw_board()
-	_draw_ghost()
-	_draw_active_piece()
-	_draw_next()
-	_draw_hold()
 
 
 # --- 入力 ------------------------------------------------------------------
@@ -149,89 +139,6 @@ func _on_topped_out() -> void:
 func _update_status(message: String) -> void:
 	var lines: int = _session.get_scoring().get_cleared_lines_total() if _session != null else 0
 	_status_label.text = "Lines: %d    %s" % [lines, message]
-
-
-# --- 描画 ------------------------------------------------------------------
-
-
-func _cell_rect(x: int, y: int, origin: Vector2) -> Rect2:
-	return Rect2(origin + Vector2(x * CELL_SIZE, y * CELL_SIZE), Vector2(CELL_SIZE, CELL_SIZE))
-
-
-func _draw_board() -> void:
-	var board: Board = _session.get_board()
-	for row in range(Board.VISIBLE_HEIGHT):
-		for x in range(Board.WIDTH):
-			var value: int = board.get_cell(x, Board.VISIBLE_TOP_Y + row)
-			var rect: Rect2 = _cell_rect(x, row, BOARD_ORIGIN)
-			draw_rect(rect, _cell_color(value))
-			draw_rect(rect, GRID_COLOR, false, 1.0)
-
-
-## セルの値に対応する色を返す。
-##
-## 盤面には Piece の種類（0〜6）のほかに Garbage（[constant GarbageQueue.GARBAGE_CELL]）が
-## 入る。[constant PIECE_COLORS] の添字は 0〜6 までなので、Garbage をそのまま引くと
-## 範囲外参照になる。
-func _cell_color(value: int) -> Color:
-	if value == Board.EMPTY:
-		return EMPTY_COLOR
-	if value == GarbageQueue.GARBAGE_CELL:
-		return GARBAGE_COLOR
-	return PIECE_COLORS[value]
-
-
-func _draw_ghost() -> void:
-	var piece: ActivePiece = _session.get_active_piece()
-	if not piece.is_active():
-		return
-
-	var landing: Vector2i = _session.get_ghost_position()
-	var color: Color = PIECE_COLORS[piece.type]
-	color.a = GHOST_ALPHA
-	for cell in Collision.get_cells(piece.type, piece.rotation, landing):
-		_draw_board_cell(cell, color)
-
-
-func _draw_active_piece() -> void:
-	var piece: ActivePiece = _session.get_active_piece()
-	if not piece.is_active():
-		return
-
-	for cell in piece.get_cells():
-		_draw_board_cell(cell, PIECE_COLORS[piece.type])
-
-
-func _draw_board_cell(cell: Vector2i, color: Color) -> void:
-	var row: int = cell.y - Board.VISIBLE_TOP_Y
-	if row < 0 or row >= Board.VISIBLE_HEIGHT:
-		return
-	draw_rect(_cell_rect(cell.x, row, BOARD_ORIGIN), color)
-
-
-func _draw_next() -> void:
-	var types: Array[int] = _session.get_next_types()
-	for index in range(types.size()):
-		var origin: Vector2 = PREVIEW_ORIGIN + Vector2(0, index * 3 * CELL_SIZE)
-		_draw_piece_preview(types[index], origin)
-
-
-func _draw_hold() -> void:
-	var held: int = _session.get_hold_slot().get_held_type()
-	if held == HoldSlot.EMPTY:
-		return
-	var color: Color = PIECE_COLORS[held]
-	if not _session.get_hold_slot().can_hold():
-		color = color.darkened(0.5)
-	_draw_piece_preview(held, HOLD_ORIGIN, color)
-
-
-func _draw_piece_preview(
-	type: int, origin: Vector2, override_color: Color = Color.TRANSPARENT
-) -> void:
-	var color: Color = PIECE_COLORS[type] if override_color.a == 0.0 else override_color
-	for offset in Piece.get_cells(type, Piece.SPAWN_ROTATION):
-		draw_rect(_cell_rect(offset.x, offset.y, origin), color)
 
 
 func _load_rules() -> GameRules:
