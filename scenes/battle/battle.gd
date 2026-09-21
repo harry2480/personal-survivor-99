@@ -11,6 +11,8 @@ extends Node2D
 ## ├── OpponentGrid       … 対戦相手の一覧（#49）
 ## ├── PlayerBoardPanel   … 自分の盤面 + Hold / NEXT（#48）
 ## ├── BattleHud          … 状況表示（#50）
+## ├── AudioManager       … SE（#53）
+## ├── MusicManager       … BGM（#53）
 ## └── InputManager       … Input Action → Game Command（§11）
 ## [/codeblock]
 ##
@@ -35,6 +37,8 @@ var _board_panel: PlayerBoardPanel
 var _opponent_grid: OpponentGrid
 var _hud: BattleHud
 var _pause_menu: PauseMenu
+var _audio: AudioManager
+var _music: MusicManager
 var _setup: BattleSetup
 var _paused: bool = false
 var _finished: bool = false
@@ -44,6 +48,7 @@ func _ready() -> void:
 	_setup = SceneRouter.get_battle_setup()
 	_runner = _create_runner()
 	_build_views()
+	_build_audio()
 	_build_pause_menu()
 	_build_input()
 
@@ -82,12 +87,27 @@ func set_paused(paused: bool) -> void:
 		_input.release_all()
 	if _pause_menu != null:
 		_pause_menu.visible = paused
+	# Pause 中は SE を止め、BGM は減衰させる（要件定義 §96）。
+	if _audio != null:
+		_audio.set_enabled(not paused)
+	if _music != null:
+		_music.set_ducked(paused)
 	SceneRouter.set_battle_paused(paused)
 
 
 ## 一時停止中かを返す。
 func is_paused() -> bool:
 	return _paused
+
+
+## SE の管理を返す。
+func get_audio_manager() -> AudioManager:
+	return _audio
+
+
+## BGM の管理を返す。
+func get_music_manager() -> MusicManager:
+	return _music
 
 
 ## Pause メニューを返す。
@@ -160,6 +180,28 @@ func _build_views() -> void:
 		_opponent_grid.set_palette(palette)
 
 
+func _build_audio() -> void:
+	var manager: BattleManager = _runner.get_manager()
+	var viewer: BattlePlayerState = manager.get_player(VIEWER_ID)
+
+	_audio = AudioManager.new()
+	_audio.name = "AudioManager"
+	add_child(_audio)
+	_audio.bind_session(viewer.session)
+	_audio.bind_battle(_runner.get_ko_system(), _runner.get_target_manager(), VIEWER_ID)
+
+	_music = MusicManager.new()
+	_music.name = "MusicManager"
+	add_child(_music)
+	_music.follow_phase(manager.get_phase())
+
+	# 残存人数の段階が変わったら BGM も変える（要件定義 §93）。
+	manager.phase_changed.connect(
+		func(_previous: int, current: int) -> void:
+			_music.follow_phase(current as BattlePhase.Phase)
+	)
+
+
 func _build_pause_menu() -> void:
 	_pause_menu = PauseMenu.new()
 	_pause_menu.name = "PauseMenu"
@@ -187,6 +229,14 @@ func _on_battle_finished() -> void:
 		return
 	_finished = true
 	set_process(false)
+
+	var viewer: BattlePlayerState = get_viewer()
+	var won: bool = viewer != null and viewer.alive
+	if _music != null:
+		_music.play_result(won)
+	if _audio != null:
+		_audio.play(AudioManager.Event.VICTORY if won else AudioManager.Event.DEFEAT)
+
 	SceneRouter.finish_battle()
 
 
@@ -225,6 +275,9 @@ func _on_command_pressed(command: GameCommand.Command) -> void:
 			session.hold()
 		GameCommand.Command.PAUSE:
 			set_paused(not _paused)
+
+	if _audio != null and command != GameCommand.Command.PAUSE:
+		_audio.play_for_command(command)
 
 
 func _on_command_released(command: GameCommand.Command) -> void:
