@@ -6,6 +6,7 @@ CI では動かさない計測・検証用のスクリプト置き場。
 |---|---|---|
 | `benchmark_cpu_search.gd` | CPU の配置探索にかかる時間を測る | `scripts/benchmark-cpu.sh` |
 | `benchmark_cpu_strength.gd` | Strength ごとの CPU の強さを測る | `scripts/benchmark-cpu-strength.sh` |
+| `benchmark_battle_scaling.gd` | Player 数ごとの Simulation 負荷を測る | `scripts/benchmark-battle-scaling.sh` |
 
 ## benchmark_cpu_search.gd
 
@@ -85,3 +86,39 @@ Machine 相当（150）の Attack が桁違いで 20 秒足らずで決着する
 
 試合を最後まで回すため実行時間が長い。通常の CI の必須 check には含めず、
 Strength Mapping を調整したときに手で実行する（#45 の制約）。
+
+## benchmark_battle_scaling.gd
+
+Player 数を 2 → 10 → 30 → 50 → 99 と上げたときの Simulation 負荷（#46 の完了条件）。
+
+```sh
+scripts/benchmark-battle-scaling.sh
+```
+
+Human 1 人 + CPU の構成で Battle を回し、1 フレームの処理時間・FPS 換算・Detailed CPU の数を出す。
+**描画を含まない Simulation だけ**の値。描画込みの実機 FPS は Phase 10（#55）で測る。
+
+### 計測結果（2026-09-22 / Apple Silicon / Godot 4.7.2 / Seed 20260922）
+
+| Player | 平均 (ms) | 最大 (ms) | FPS 換算 | Detailed CPU | Top Out | 決着 |
+|---|---|---|---|---|---|---|
+| 2 | 0.030 | 0.049 | 1000+ | 0 | 0 | 決着 |
+| 10 | 0.075 | 0.262 | 1000+ | 0 | 6 | 時間切れ |
+| 30 | 0.519 | 134.100 | 1000+ | 0 | 23 | 時間切れ |
+| 50 | 0.817 | 3.622 | 1000+ | 0 | 41 | 時間切れ |
+| 99 | 1.762 | 13.167 | 568 | 0 | 79 | 時間切れ |
+
+99 人でも平均 1.8 ms で、1 フレームの予算（16.7 ms）の約 1 割。**平均では 60 FPS に十分届く**。
+
+ただし**最大値が跳ねる**（30 人で 134 ms、99 人で 13 ms）。脱落が重なったフレームで
+Ranking / Multiplier / Target の更新が同時に走るため。1 フレームの偏りをならすのは
+CPU Update Scheduling（Phase 7 / #47）の担当。
+
+### 「時間切れ」について
+
+Lightweight Simulation（要件定義 §82）では、強い CPU ほど Garbage を捌き切ってしまい、
+終盤に残った数体が相殺し合って決着しない。上限時間（300 秒）で盤面の悪い順に畳んでいる。
+99 人戦では 98 体中 79 体が実際に Top Out して脱落し、残りが畳み込みになった。
+
+Detailed Simulation では Misdrop（要件定義 §67）があるため決着する。
+Lightweight の近似精度を上げるかは Phase 10（#55）で判断する。
