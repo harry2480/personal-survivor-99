@@ -13,6 +13,7 @@ extends Node2D
 ## ├── BattleHud          … 状況表示（#50）
 ## ├── AudioManager       … SE（#53）
 ## ├── MusicManager       … BGM（#53）
+## ├── DebugOverlay       … 開発時の状態表示（#54。Release では既定 OFF）
 ## └── InputManager       … Input Action → Game Command（§11）
 ## [/codeblock]
 ##
@@ -39,6 +40,12 @@ var _hud: BattleHud
 var _pause_menu: PauseMenu
 var _audio: AudioManager
 var _music: MusicManager
+var _debug_overlay: DebugOverlay
+var _logger := BattleLogger.new()
+var _quad_count: int = 0
+var _t_spin_count: int = 0
+var _perfect_clear_count: int = 0
+var _highest_cpu_strength_defeated: float = 0.0
 var _setup: BattleSetup
 var _paused: bool = false
 var _finished: bool = false
@@ -50,7 +57,9 @@ func _ready() -> void:
 	_build_views()
 	_build_audio()
 	_build_pause_menu()
+	_build_debug_overlay()
 	_build_input()
+	_watch_progress()
 
 
 func _process(delta: float) -> void:
@@ -63,6 +72,7 @@ func _process(delta: float) -> void:
 
 
 func _exit_tree() -> void:
+	_logger.unbind()
 	if _runner != null:
 		_runner.dispose()
 		_runner = null
@@ -108,6 +118,39 @@ func get_audio_manager() -> AudioManager:
 ## BGM の管理を返す。
 func get_music_manager() -> MusicManager:
 	return _music
+
+
+## Debug Overlay を返す（要件定義 §113）。
+func get_debug_overlay() -> DebugOverlay:
+	return _debug_overlay
+
+
+## 記録している Battle のログを返す（要件定義 §112）。
+func get_logger() -> BattleLogger:
+	return _logger
+
+
+## いまの内容で結果をまとめる（要件定義 §99）。
+func build_outcome() -> BattleOutcome:
+	var outcome := BattleOutcome.create_empty()
+	var viewer: BattlePlayerState = get_viewer()
+	var manager: BattleManager = _runner.get_manager()
+
+	outcome.player_count = manager.get_player_count()
+	outcome.rank = viewer.rank if viewer != null and viewer.rank > 0 else 1
+	outcome.ko_count = viewer.ko_count if viewer != null else 0
+	outcome.cleared_lines = (
+		viewer.session.get_scoring().get_cleared_lines_total()
+		if viewer != null and viewer.session != null
+		else 0
+	)
+	outcome.quad_count = _quad_count
+	outcome.t_spin_count = _t_spin_count
+	outcome.perfect_clear_count = _perfect_clear_count
+	outcome.duration_sec = _runner.get_elapsed_sec()
+	outcome.highest_cpu_strength_defeated = _highest_cpu_strength_defeated
+	outcome.battle_seed = manager.get_battle_seed()
+	return outcome
 
 
 ## Pause メニューを返す。
@@ -202,6 +245,41 @@ func _build_audio() -> void:
 	)
 
 
+func _build_debug_overlay() -> void:
+	_debug_overlay = DebugOverlay.new()
+	_debug_overlay.name = "DebugOverlay"
+	_debug_overlay.position = MARGIN + Vector2(900.0, 360.0)
+	add_child(_debug_overlay)
+	_debug_overlay.bind(_runner)
+
+
+# 結果に必要な数（Quad / T-Spin / Perfect Clear / 倒した CPU の強さ）を数える。
+func _watch_progress() -> void:
+	var manager: BattleManager = _runner.get_manager()
+	var viewer: BattlePlayerState = manager.get_player(VIEWER_ID)
+	if viewer != null and viewer.session != null:
+		viewer.session.lines_cleared.connect(_on_lines_cleared)
+		viewer.session.t_spin_detected.connect(func(_result: int) -> void: _t_spin_count += 1)
+		viewer.session.perfect_clear_achieved.connect(func() -> void: _perfect_clear_count += 1)
+
+	_runner.get_ko_system().player_ko.connect(_on_player_ko)
+	_logger.bind(manager, _runner.get_ko_system(), _runner.get_target_manager(), null)
+
+
+func _on_lines_cleared(result: LineClearResult) -> void:
+	if result.line_count >= 4:
+		_quad_count += 1
+
+
+func _on_player_ko(victim: int, attacker: int) -> void:
+	# 自分が倒した相手の Strength を覚えておく（要件定義 §99）。
+	if attacker != VIEWER_ID:
+		return
+	_highest_cpu_strength_defeated = maxf(
+		_highest_cpu_strength_defeated, _runner.get_strength(victim)
+	)
+
+
 func _build_pause_menu() -> void:
 	_pause_menu = PauseMenu.new()
 	_pause_menu.name = "PauseMenu"
@@ -237,7 +315,7 @@ func _on_battle_finished() -> void:
 	if _audio != null:
 		_audio.play(AudioManager.Event.VICTORY if won else AudioManager.Event.DEFEAT)
 
-	SceneRouter.finish_battle()
+	SceneRouter.finish_battle(build_outcome())
 
 
 func _build_input() -> void:

@@ -46,6 +46,7 @@ var current_state: GameState.State = GameState.State.BOOT
 var _current_scene_path: String = ""
 var _battle_setup: BattleSetup = BattleSetup.create_default()
 var _user_settings: UserSettings = null
+var _last_outcome: BattleOutcome = BattleOutcome.create_empty()
 
 
 ## ユーザー設定を返す（要件定義 §97 / §98）。
@@ -118,8 +119,17 @@ func set_battle_paused(paused: bool) -> void:
 		change_state(GameState.State.PLAYING)
 
 
+## 直前の Battle の結果を返す（Result 画面が読む。要件定義 §99）。
+func get_last_outcome() -> BattleOutcome:
+	return _last_outcome
+
+
 ## Battle の決着を伝える（要件定義 §109）。
-func finish_battle() -> void:
+##
+## [param outcome] を渡すと Result 画面がそれを表示する。
+func finish_battle(outcome: BattleOutcome = null) -> void:
+	if outcome != null:
+		_last_outcome = outcome
 	change_state(GameState.State.FINISHED)
 	change_state(GameState.State.RESULT)
 
