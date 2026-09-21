@@ -152,6 +152,13 @@ func update(delta_sec: float) -> void:
 			eliminate_player(player.player_id)
 
 
+## その Player の Seed を返す（要件定義 §110）。
+##
+## Player ごとに Seed をずらす。Battle Seed を決めれば全体が再現できる。
+func get_seed_for(player_id: int) -> int:
+	return _battle_seed + player_id * 7919
+
+
 ## Player を脱落させる（要件定義 §54）。
 ##
 ## 脱落時の生存人数がそのまま順位になる（要件定義 §55）。
@@ -172,8 +179,7 @@ func eliminate_player(player_id: int) -> void:
 
 
 func _seed_for(player_id: int) -> int:
-	# Player ごとに Seed をずらす。Battle Seed を決めれば全体が再現できる。
-	return _battle_seed + player_id * 7919
+	return get_seed_for(player_id)
 
 
 func _refresh_phase() -> void:
