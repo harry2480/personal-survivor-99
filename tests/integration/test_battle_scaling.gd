@@ -117,14 +117,15 @@ func test_ninety_nine_player_battle_finishes() -> void:
 	var runner: CpuBattleRunner = _run_scaling_case(99)
 
 	assert_gt(runner.get_combat_elimination_count(), 0, "Garbage を受けた Player が実際に脱落する")
+	var stats: CpuBattleRunner.FrameStats = runner.get_frame_stats()
 	gut.p(
 		(
 			"99 人戦: 平均 %.3f ms/frame（%.0f FPS 相当）/ 最大 %.3f ms / %d frames / Top Out %d 人 / 時間切れ %s"
 			% [
-				runner.get_average_frame_msec(),
-				runner.get_estimated_fps(),
-				runner.get_max_frame_msec(),
-				runner.get_frame_count(),
+				stats.average_msec,
+				stats.estimated_fps,
+				stats.max_msec,
+				stats.frames,
 				runner.get_combat_elimination_count(),
 				runner.is_timed_out()
 			]
@@ -138,10 +139,11 @@ func test_ninety_nine_player_battle_finishes() -> void:
 func test_frame_time_is_measured() -> void:
 	var runner: CpuBattleRunner = _run_scaling_case(30)
 
-	assert_gt(runner.get_frame_count(), 0, "フレーム数が記録される")
-	assert_gt(runner.get_average_frame_msec(), 0.0, "平均 Frame Time が記録される")
-	assert_gte(runner.get_max_frame_msec(), runner.get_average_frame_msec(), "最大は平均以上")
-	assert_gt(runner.get_estimated_fps(), 0.0, "FPS 換算が出る")
+	var stats: CpuBattleRunner.FrameStats = runner.get_frame_stats()
+	assert_gt(stats.frames, 0, "フレーム数が記録される")
+	assert_gt(stats.average_msec, 0.0, "平均 Frame Time が記録される")
+	assert_gte(stats.max_msec, stats.average_msec, "最大は平均以上")
+	assert_gt(stats.estimated_fps, 0.0, "FPS 換算が出る")
 	assert_eq(runner.get_detailed_count(), 0, "Lightweight だけで回している（#42）")
 
 
@@ -150,7 +152,7 @@ func test_simulation_keeps_the_frame_budget() -> void:
 	# 時間がここで予算（16.6 ms）を食い潰していないことを見る。
 	var runner: CpuBattleRunner = _run_scaling_case(99)
 
-	assert_lt(runner.get_average_frame_msec(), 16.6, "99 人でも 1 フレームの予算に収まる")
+	assert_lt(runner.get_frame_stats().average_msec, 16.6, "99 人でも 1 フレームの予算に収まる")
 
 
 # --- 再現性（要件定義 §110） -------------------------------------------------

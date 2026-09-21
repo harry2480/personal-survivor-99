@@ -50,14 +50,15 @@ func _measure(player_count: int) -> void:
 		frame += 1
 	runner.run(runner.get_elapsed_sec())
 
+	var stats: CpuBattleRunner.FrameStats = runner.get_frame_stats()
 	print(
 		(
 			"| %d | %.3f | %.3f | %.0f | %d | %d | %s |"
 			% [
 				player_count,
-				runner.get_average_frame_msec(),
-				runner.get_max_frame_msec(),
-				runner.get_estimated_fps(),
+				stats.average_msec,
+				stats.max_msec,
+				stats.estimated_fps,
 				runner.get_detailed_count(),
 				runner.get_combat_elimination_count(),
 				"時間切れ" if runner.is_timed_out() else "決着"
