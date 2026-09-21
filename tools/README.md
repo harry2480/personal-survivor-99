@@ -8,6 +8,8 @@ CI では動かさない計測・検証用のスクリプト置き場。
 | `benchmark_cpu_strength.gd` | Strength ごとの CPU の強さを測る | `scripts/benchmark-cpu-strength.sh` |
 | `benchmark_battle_scaling.gd` | Player 数ごとの Simulation 負荷を測る | `scripts/benchmark-battle-scaling.sh` |
 | `benchmark_cpu_scheduling.gd` | CPU 更新の分散の効き方を測る | `scripts/benchmark-cpu-scheduling.sh` |
+| `profile_battle.gd` | 99 人戦の 1 フレームの内訳を測る | `scripts/profile-battle.sh` |
+| `verify_determinism.gd` | 同じ Seed から同じ決着になるか確かめる | `scripts/verify-determinism.sh` |
 
 ## benchmark_cpu_search.gd
 
@@ -156,3 +158,16 @@ p99 が 0.685 ms → 0.016 ms（8 分割）まで下がる。Human Input は前�
 
 最初に測る行はプロセス起動直後の影響を受け、最大値が跳ねることがある。
 傾向は平均と p99 で見る。
+
+## profile_battle.gd / verify_determinism.gd
+
+99 人戦のどこに時間がかかっているかを部位ごとに測り（#55）、最適化の前後で結果が
+変わっていないことを確かめる。
+
+```sh
+scripts/profile-battle.sh        # 内訳を測る
+scripts/verify-determinism.sh    # 決着が変わっていないか確かめる
+```
+
+計測結果・最適化の内容・GDExtension の導入判断は
+[docs/性能計測と最適化.md](../docs/性能計測と最適化.md) に記録している。

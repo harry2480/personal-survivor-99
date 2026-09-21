@@ -41,6 +41,7 @@ func register(player_id: int, profile: CpuProfile) -> void:
 	_profiles[player_id] = profile
 	_modes[player_id] = Mode.LIGHTWEIGHT
 	_lightweight[player_id] = LightweightCpu.new(profile, _seed + player_id)
+	_set_board_simulation(player_id, false)
 
 
 ## Battle の全 CPU を同じ Strength で登録する。
@@ -199,6 +200,7 @@ func promote(player_id: int, reason: String = "") -> bool:
 
 	_detailed[player_id] = DetailedCpu.new(_profiles[player_id], player.session, _seed + player_id)
 	_lightweight.erase(player_id)
+	_set_board_simulation(player_id, true)
 	_set_mode(player_id, Mode.DETAILED, reason)
 	return true
 
@@ -216,6 +218,7 @@ func demote(player_id: int, reason: String = "") -> bool:
 
 	_lightweight[player_id] = lightweight
 	_detailed.erase(player_id)
+	_set_board_simulation(player_id, false)
 	_set_mode(player_id, Mode.LIGHTWEIGHT, reason)
 	return true
 
@@ -254,6 +257,13 @@ func receive_garbage(player_id: int, line_count: int) -> void:
 		_detailed[player_id].receive_garbage(line_count)
 	elif _lightweight.has(player_id):
 		_lightweight[player_id].receive_garbage(line_count)
+
+
+# 盤面を進めるかどうかを Battle Layer 側へ伝える（#55 の最適化）。
+func _set_board_simulation(player_id: int, enabled: bool) -> void:
+	var player: BattlePlayerState = _manager.get_player(player_id)
+	if player != null:
+		player.simulates_board = enabled
 
 
 func _set_mode(player_id: int, mode: Mode, reason: String) -> void:

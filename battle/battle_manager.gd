@@ -143,6 +143,10 @@ func update(delta_sec: float) -> void:
 			break
 		if not player.alive or player.session == null:
 			continue
+		# 盤面を使わない Player（Lightweight の CPU）は進めない。
+		# 状態は CPU 側の指標が持っている（要件定義 §82）。
+		if not player.simulates_board:
+			continue
 
 		player.session.update(delta_sec)
 		player.refresh_danger_level()
