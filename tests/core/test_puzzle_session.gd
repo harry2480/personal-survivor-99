@@ -244,3 +244,70 @@ func _dominant_locked_type() -> int:
 			if value != Board.EMPTY:
 				return value
 	return -1
+
+
+# --- T-Spin 判定 Module への受け渡し ----------------------------------------
+
+
+class RecordingDetector:
+	extends TSpinDetector
+
+	var last_context: TSpinContext
+
+	func detect(context: TSpinContext) -> Result:
+		last_context = context
+		return super.detect(context)
+
+
+func test_rotation_is_reported_to_the_t_spin_module() -> void:
+	var detector := RecordingDetector.new()
+	session.set_t_spin_detector(detector)
+
+	session.rotate(RotationSystem.Direction.CLOCKWISE)
+	session.hard_drop()
+
+	assert_not_null(detector.last_context, "判定 Module が呼ばれる")
+	assert_not_null(detector.last_context.board, "盤面が渡される")
+	assert_true(detector.last_context.piece_type >= 0, "Piece の種類が渡される")
+
+
+func test_module_receives_the_rotation_flag_and_kick_index() -> void:
+	var detector := RecordingDetector.new()
+	session.set_t_spin_detector(detector)
+	var piece: ActivePiece = session.get_active_piece()
+	piece.spawn(Piece.Type.T)
+	piece.position = Vector2i(3, Board.TOTAL_HEIGHT - 2)  # 床に接した状態
+
+	# 床際で回転すると Wall Kick が働く（表の 2 番目）。
+	assert_true(session.rotate(RotationSystem.Direction.CLOCKWISE), "前提: 回転できる")
+	session.hard_drop()
+
+	assert_true(detector.last_context.last_action_was_rotation, "直前の操作が回転だと伝わる")
+	assert_eq(detector.last_context.kick_index, 2, "採用された Kick の index が伝わる")
+	assert_eq(detector.last_context.kick_table_size, 5, "Kick Table の長さも伝わる")
+	assert_eq(detector.last_context.piece_type, Piece.Type.T as int, "Piece の種類が伝わる")
+
+
+func test_moving_after_rotating_clears_the_rotation_flag() -> void:
+	var detector := RecordingDetector.new()
+	session.set_t_spin_detector(detector)
+
+	session.rotate(RotationSystem.Direction.CLOCKWISE)
+	session.press_move(AutoShift.Direction.LEFT)
+	session.hard_drop()
+
+	assert_false(detector.last_context.last_action_was_rotation, "移動すると回転扱いではなくなる")
+
+
+func test_falling_after_rotating_clears_the_rotation_flag() -> void:
+	rules.gravity_cells_per_second = 5.0
+	session = PuzzleSession.new(rules, PieceRandomizer.new(SEED))
+	session.start(SEED)
+	var detector := RecordingDetector.new()
+	session.set_t_spin_detector(detector)
+
+	session.rotate(RotationSystem.Direction.CLOCKWISE)
+	session.update(1.0)
+	session.hard_drop()
+
+	assert_false(detector.last_context.last_action_was_rotation, "落下でも回転扱いではなくなる")

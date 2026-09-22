@@ -22,6 +22,9 @@ signal lines_cleared(result: LineClearResult)
 ## Hold を使った。
 signal piece_held(held_type: int)
 
+## T-Spin と判定された（[enum TSpinDetector.Result]）。
+signal t_spin_detected(result: int)
+
 ## Top Out した（Spawn できなかった）。
 signal topped_out
 
@@ -35,8 +38,11 @@ var _rotation: RotationSystem
 var _drop: DropSystem
 var _auto_shift: AutoShift
 var _lock_delay: LockDelay
-var _combo: ComboState
-var _b2b: BackToBackState
+var _scoring: ScoringState
+var _t_spin_detector: TSpinDetector
+var _last_action_was_rotation: bool = false
+var _last_kick_index: int = -1
+var _last_kick_table_size: int = 0
 var _is_over: bool = false
 var _cleared_lines_total: int = 0
 
@@ -54,8 +60,8 @@ func _init(
 	_drop = DropSystem.new(_rules)
 	_auto_shift = AutoShift.new(_rules)
 	_lock_delay = LockDelay.new(_rules)
-	_combo = ComboState.new()
-	_b2b = BackToBackState.new(_balance)
+	_scoring = ScoringState.new(_balance)
+	_t_spin_detector = TSpinDetector.new()
 
 
 ## 新しいゲームを始める。Seed を指定すると Piece 列が再現できる。
@@ -65,8 +71,7 @@ func start(game_seed: int = 0) -> void:
 	_hold.clear()
 	_auto_shift.release_all()
 	_drop.set_soft_dropping(false)
-	_combo.reset()
-	_b2b.reset()
+	_scoring.reset()
 	_is_over = false
 	_cleared_lines_total = 0
 	_spawn_next()
@@ -108,8 +113,9 @@ func rotate(direction: RotationSystem.Direction) -> bool:
 	if not _can_control():
 		return false
 
+	var from_rotation: int = _piece.rotation
 	var result: RotationResult = _rotation.rotate(
-		_board, _piece.type, _piece.rotation, _piece.position, direction
+		_board, _piece.type, from_rotation, _piece.position, direction
 	)
 	if not result.success:
 		return false
@@ -117,6 +123,13 @@ func rotate(direction: RotationSystem.Direction) -> bool:
 	_piece.rotation = result.rotation
 	_piece.position = result.position
 	_lock_delay.notify_action(LockDelay.Action.ROTATE)
+
+	# T-Spin 判定は「直前の操作が回転か」と「どの Kick で収まったか」を根拠にする（§33）。
+	_last_action_was_rotation = true
+	_last_kick_index = result.kick_index
+	_last_kick_table_size = (
+		_rotation.get_kick_table(_piece.type).get_offsets(from_rotation, result.rotation).size()
+	)
 	return true
 
 
@@ -126,6 +139,9 @@ func hard_drop() -> int:
 		return 0
 
 	var distance: int = DropSystem.hard_drop(_board, _piece)
+	if distance > 0:
+		# 回転してすぐ Hard Drop した場合、1 マスも落ちなければ直前の操作は回転のまま。
+		_clear_rotation_flag()
 	if _drop.locks_after_hard_drop():
 		_lock_piece()
 	return distance
@@ -187,22 +203,40 @@ func get_cleared_lines_total() -> int:
 	return _cleared_lines_total
 
 
-## 現在の連続 Line Clear 数を返す（要件定義 §34）。
-func get_combo_count() -> int:
-	return _combo.get_count()
+## Combo / Back-to-Back / 直前の T-Spin をまとめた状態を返す。
+##
+## Attack 計算（#30）はこれをそのまま入力にする。
+func get_scoring() -> ScoringState:
+	return _scoring
 
 
-## 現在の Back-to-Back の鎖の長さを返す（要件定義 §35）。
-func get_b2b_chain() -> int:
-	return _b2b.get_chain()
-
-
-## Back-to-Back の効果が乗る状態かを返す。
-func is_b2b_active() -> bool:
-	return _b2b.is_active()
+## T-Spin 判定 Module を差し替える。方式を変えたいときに使う。
+func set_t_spin_detector(detector: TSpinDetector) -> void:
+	if detector != null:
+		_t_spin_detector = detector
 
 
 # --- 内部 ------------------------------------------------------------------
+
+
+func _clear_rotation_flag() -> void:
+	_last_action_was_rotation = false
+	_last_kick_index = -1
+	_last_kick_table_size = 0
+
+
+func _detect_t_spin() -> TSpinDetector.Result:
+	# Piece を置く前の盤面で判定する。
+	var context: TSpinContext = TSpinContext.create(
+		_board,
+		_piece.type,
+		_piece.rotation,
+		_piece.position,
+		_last_action_was_rotation,
+		_last_kick_index,
+		_last_kick_table_size
+	)
+	return _t_spin_detector.detect(context)
 
 
 func _can_control() -> bool:
@@ -229,6 +263,7 @@ func _move_horizontally(step_x: int, steps: int) -> void:
 
 	if moved:
 		_lock_delay.notify_action(LockDelay.Action.MOVE)
+		_clear_rotation_flag()
 
 
 func _apply_gravity(delta_sec: float) -> void:
@@ -238,6 +273,7 @@ func _apply_gravity(delta_sec: float) -> void:
 		if not Collision.can_place(_board, _piece.type, _piece.rotation, candidate):
 			break
 		_piece.position = candidate
+		_clear_rotation_flag()
 
 
 func _apply_lock_delay(delta_sec: float) -> void:
@@ -248,15 +284,17 @@ func _apply_lock_delay(delta_sec: float) -> void:
 
 func _lock_piece() -> void:
 	var locked_type: int = _piece.type
+	var t_spin: TSpinDetector.Result = _detect_t_spin()
+	if t_spin != TSpinDetector.Result.NONE:
+		t_spin_detected.emit(t_spin)
+
 	Collision.place(_board, _piece.type, _piece.rotation, _piece.position)
 	_piece.clear()
 	piece_locked.emit(locked_type)
 
 	var result: LineClearResult = LineClear.execute(_board)
 
-	# Combo は Line Clear なしの Lock で終了するが、B2B は維持される（§34 / §35）。
-	_combo.on_piece_locked(result.line_count)
-	_b2b.on_piece_locked(result.type, result.line_count)
+	_scoring.on_piece_locked(result, t_spin)
 
 	if result.has_cleared():
 		_cleared_lines_total += result.line_count
@@ -272,6 +310,7 @@ func _spawn_next() -> void:
 
 func _spawn(type: int) -> void:
 	_piece.spawn(type)
+	_clear_rotation_flag()
 	_drop.start_new_piece()
 	_lock_delay.start_new_piece()
 

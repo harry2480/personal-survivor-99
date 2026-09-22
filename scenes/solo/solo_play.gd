@@ -9,6 +9,12 @@ extends Node2D
 ## Presentation Layer なので、Game Core の内部状態を直接書き換えない（要件定義 §19）。
 ## 操作は [InputManager] が返す [enum GameCommand.Command] だけを見る（§11）。
 
+## 画面の進行状態。
+##
+## set_process() だけで止めると、_process() は止まっても InputManager は入力を
+## 受け続け、Pause 中や TOP OUT 後も Session を操作できてしまう。
+enum ScreenState { PLAYING, PAUSED, TOPPED_OUT }
+
 const CELL_SIZE: int = 24
 const BOARD_ORIGIN := Vector2(40, 40)
 const PREVIEW_ORIGIN := Vector2(40 + 10 * CELL_SIZE + 24, 40)
@@ -30,6 +36,7 @@ const GHOST_ALPHA: float = 0.28
 var _session: PuzzleSession
 var _input: InputManager
 var _status_label: Label
+var _state: ScreenState = ScreenState.PLAYING
 
 
 func _ready() -> void:
@@ -52,6 +59,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _state != ScreenState.PLAYING:
+		return
 	_session.update(delta)
 	queue_redraw()
 
@@ -68,6 +77,14 @@ func _draw() -> void:
 
 
 func _on_command_pressed(command: GameCommand.Command) -> void:
+	if _state == ScreenState.TOPPED_OUT:
+		return
+	if command == GameCommand.Command.PAUSE:
+		_toggle_pause()
+		return
+	if _state == ScreenState.PAUSED:
+		return
+
 	match command:
 		GameCommand.Command.MOVE_LEFT:
 			_session.press_move(AutoShift.Direction.LEFT)
@@ -83,11 +100,11 @@ func _on_command_pressed(command: GameCommand.Command) -> void:
 			_session.rotate(RotationSystem.Direction.CLOCKWISE)
 		GameCommand.Command.HOLD:
 			_session.hold()
-		GameCommand.Command.PAUSE:
-			_toggle_pause()
 
 
 func _on_command_released(command: GameCommand.Command) -> void:
+	# 解除は状態を問わず通す。Pause 時の release_all() を無視すると、再開時に
+	# 押しっぱなし扱いが残る。
 	match command:
 		GameCommand.Command.MOVE_LEFT:
 			_session.release_move(AutoShift.Direction.LEFT)
@@ -99,9 +116,16 @@ func _on_command_released(command: GameCommand.Command) -> void:
 
 func _toggle_pause() -> void:
 	# Phase 1 では Scene を切り替えず、この画面の中で止めるだけにする。
-	set_process(not is_processing())
+	match _state:
+		ScreenState.PLAYING:
+			_state = ScreenState.PAUSED
+		ScreenState.PAUSED:
+			_state = ScreenState.PLAYING
+		_:
+			return
+
 	_input.release_all()
-	_update_status("PAUSED" if not is_processing() else "")
+	_update_status("PAUSED" if _state == ScreenState.PAUSED else "")
 
 
 # --- 進行 ------------------------------------------------------------------
@@ -112,7 +136,8 @@ func _on_lines_cleared(result: LineClearResult) -> void:
 
 
 func _on_topped_out() -> void:
-	set_process(false)
+	_state = ScreenState.TOPPED_OUT
+	_input.release_all()
 	_update_status("TOP OUT")
 
 
@@ -194,7 +219,9 @@ func _draw_piece_preview(
 func _load_rules() -> GameRules:
 	# Presentation Layer が読み込んで Game Core へ渡す（Game Core は FileSystem を
 	# 知らない。要件定義 §17）。
+	# load() は Resource をキャッシュして共有するため、複製してから渡す。
+	# 複製しないと apply_user_settings() の書き換えが全読み込み先へ波及する。
 	var rules: Resource = load("res://config/game_rules.tres")
 	if rules is GameRules:
-		return rules as GameRules
+		return rules.duplicate() as GameRules
 	return GameRules.create_default()
