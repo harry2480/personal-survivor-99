@@ -25,6 +25,10 @@ if [ -z "$godot_bin" ]; then
 fi
 
 pinned="$(tr -d '[:space:]' < .godot-version)"
+if [ -z "$pinned" ]; then
+  echo ".godot-version が空です。固定する Godot のバージョンを記述してください。" >&2
+  exit 1
+fi
 actual="$("$godot_bin" --version | head -n 1)"
 if [ "${SKIP_GODOT_VERSION_CHECK:-0}" != "1" ]; then
   # .godot-version は "4.7.2-stable"、--version は "4.7.2.stable.official.xxxxxxx"
