@@ -16,8 +16,10 @@ macOS（Apple Silicon）向けの 99 人対戦型 落ちものパズルゲーム
 # エディタ起動
 /Applications/Godot.app/Contents/MacOS/Godot --editor --path .
 
+scripts/static-check.sh         # Lint / フォーマット / 命名規約 / 依存方向
 scripts/verify-godot.sh         # import + 起動検証（CI と同じ）
 scripts/run-tests.sh            # GUT の自動テストを headless 実行
+scripts/export-macos.sh         # macOS Export Validation（Export Templates が必要）
 scripts/setup-loop-labels.sh   # Loop 用ラベルの作成・更新
 scripts/loop-once.sh           # Loopを1回だけ実行
 scripts/loop.sh                # 最大5回までLoopを反復（LOOP_MAX_ITERATIONSで調整）
@@ -25,7 +27,8 @@ bash scripts/merge-pr.sh       # PR マージ + ブランチ整理
 ```
 
 自動テストは GUT で書き、`scripts/run-tests.sh` で実行する。
-Static Check と macOS Export Validation を含む本番 CI の構築は #19 で行う（テストの CI 組み込みも #19）。
+CI（Static Check / Import / Headless テスト / macOS Export Validation）は
+`.github/workflows/ci.yml` で、ローカルと同じスクリプトを呼ぶ。
 
 Loopを使う場合は [docs/loop-engineering.md](docs/loop-engineering.md) の初期設定、Issue信頼境界、auto-merge条件に従う。Loop関連コマンドは `.claude/commands/loop-*.md` に定義する。
 
@@ -108,14 +111,17 @@ GUT は `addons/gut/` にバージョン固定で同梱している（更新手�
 コード変更後は最低限これを実行して、エラーが出ないことを確認する。
 
 ```sh
+scripts/static-check.sh   # Lint / フォーマット / 命名規約 / 依存方向
 scripts/verify-godot.sh   # import + 起動検証
 scripts/run-tests.sh      # 自動テスト
 ```
 
 Godot はスクリプトエラーが出ても終了コード 0 を返すため、終了コードだけで成否を判断しない。
-`scripts/verify-godot.sh` は出力に `ERROR` / `SCRIPT ERROR` があれば失敗する。CI も同じスクリプトを使う。
+`scripts/verify-godot.sh` は出力に `ERROR` / `SCRIPT ERROR` / `WARNING` があれば失敗する。
+CI も同じスクリプトを使う。
 
-Static Check・自動テスト・macOS Export Validation を含む完全な CI は #19 で構築する。
+`scripts/static-check.sh` は gdtoolkit を使う。未導入の環境では
+`pip install -r ci/requirements-static-check.txt` を実行するか、`SKIP_GDTOOLKIT=1` を付ける。
 
 ### Git
 

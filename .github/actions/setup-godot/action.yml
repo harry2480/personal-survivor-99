@@ -1,0 +1,85 @@
+name: Godot をセットアップ
+description: >
+  .godot-version に固定したバージョンの Godot を取得し、ci/godot-checksums.txt の
+  SHA-512 で検証してから展開する。取得したバイナリのパスを出力する。
+
+outputs:
+  godot-bin:
+    description: Godot 実行ファイルのパス
+    value: ${{ steps.install.outputs.godot-bin }}
+  version:
+    description: .godot-version に固定されたバージョン
+    value: ${{ steps.version.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    # Godot のバージョンは .godot-version が唯一の参照元。ここでは複製しない。
+    - name: 固定バージョンを読み取る
+      id: version
+      shell: bash
+      run: |
+        set -euo pipefail
+        version="$(tr -d '[:space:]' < .godot-version)"
+        if [ -z "$version" ]; then
+          echo "::error::.godot-version が空です"
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "Godot $version を使用します"
+
+    - name: Godot をキャッシュ
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ~/godot
+        key: godot-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
+
+    - name: Godot を取得
+      id: install
+      shell: bash
+      env:
+        GODOT_RELEASE: ${{ steps.version.outputs.version }}
+        RUNNER_OS: ${{ runner.os }}
+      run: |
+        set -euo pipefail
+
+        # チェックサム検証はローカルの scripts/ と共有する。
+        # shellcheck source=/dev/null
+        . "${GITHUB_WORKSPACE}/scripts/lib/godot-env.sh"
+
+        mkdir -p ~/godot
+
+        case "$RUNNER_OS" in
+          Linux)
+            archive="Godot_v${GODOT_RELEASE}_linux.x86_64"
+            godot_bin="$HOME/godot/godot"
+            ;;
+          macOS)
+            archive="Godot_v${GODOT_RELEASE}_macos.universal"
+            godot_bin="$HOME/godot/Godot.app/Contents/MacOS/Godot"
+            ;;
+          *)
+            echo "::error::未対応の runner です: $RUNNER_OS"
+            exit 1
+            ;;
+        esac
+
+        if [ -x "$godot_bin" ]; then
+          echo "キャッシュを使用します"
+        else
+          url="https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/${archive}.zip"
+          work="$(mktemp -d)"
+          curl -fsSL -o "${work}/${archive}.zip" "$url"
+
+          # HTTPS は経路しか守らないため、リポジトリに固定した公式 SHA-512 で中身を検証する。
+          verify_sha512 "${work}/${archive}.zip" "${GITHUB_WORKSPACE}/ci/godot-checksums.txt"
+
+          unzip -q "${work}/${archive}.zip" -d ~/godot
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            mv "$HOME/godot/${archive}" "$godot_bin"
+          fi
+          chmod +x "$godot_bin"
+        fi
+
+        "$godot_bin" --version
+        echo "godot-bin=$godot_bin" >> "$GITHUB_OUTPUT"

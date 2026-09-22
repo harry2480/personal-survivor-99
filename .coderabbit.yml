@@ -10,6 +10,16 @@ reviews:
   auto_review:
     enabled: true
     drafts: true
+    # 既定では default branch 宛の PR しかレビューされない。
+    # Phase 0 のように PR を積み重ねる（stacked PR）場合も、
+    # base が作業ブランチのままレビューされるようにする。
+    base_branches:
+      - "main"
+      - "feature/.*"
+      - "fix/.*"
+      - "refactor/.*"
+      - "perf/.*"
+      - "chore/.*"
     ignore_title_keywords: []
     labels:
       - "!skip-ai-review"

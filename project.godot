@@ -26,6 +26,9 @@ window/stretch/aspect="keep"
 [rendering]
 
 renderer/rendering_method="mobile"
+; Mobile renderer で arm64 / universal 向けに Export するには ETC2 ASTC の
+; Import が必要（Godot の Export 設定チェックで弾かれる）。
+textures/vram_compression/import_etc2_astc=true
 
 [editor_plugins]
 
