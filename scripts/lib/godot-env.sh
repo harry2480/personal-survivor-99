@@ -36,6 +36,10 @@ assert_godot_version() {
 
   local pinned actual expected
   pinned="$(tr -d '[:space:]' < "$repo_root/.godot-version")"
+  if [ -z "$pinned" ]; then
+    echo ".godot-version が空です。固定する Godot のバージョンを記述してください。" >&2
+    return 1
+  fi
   actual="$("$godot_bin" --version | head -n 1)"
 
   if [ "${SKIP_GODOT_VERSION_CHECK:-0}" != "1" ]; then

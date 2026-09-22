@@ -27,8 +27,6 @@ GitHub の Issue labels に次のラベルを作成します。
 
 GitHubの **Allow auto-merge** を有効化し、Squash mergeを許可してください。テンプレートはGitHub側の設定を変更しません。CI成功、CodeRabbit完了、未解決レビューなし、競合なし、human/blocked状態でないことをLoopが確認してから `gh pr merge --auto --squash` を要求します。required checksと保護ルールはGitHub側で維持します。
 
-Dependabotのワークフローはpatch/minor更新だけに自動マージを要求し、major更新は対象外です。特定のdependencyを除外する場合、Actionsの変数 `DEPENDABOT_AUTOMERGE_EXCLUDED_DEPENDENCIES` に名前をカンマ区切りで設定します。Dependabotの `GITHUB_TOKEN` に書き込み権限がない環境では、最小権限の `DEPENDABOT_AUTOMERGE_TOKEN` secretを設定してください。このワークフローはPRのコードをcheckout・実行せず、更新情報を取得してGitHubに自動マージを要求します。
-
 ## Issue作成と粒度
 
 `/loop-issue` は関連コードとドキュメント、既存Issueを調べ、前提を確かめたうえで `.github/ISSUE_TEMPLATE/loop-task.md` に沿ってIssueを作ります。Issueには目的、観測可能な完了条件、対象範囲、Out of scope、関連情報、制約、人間判断が必要になる条件を含めます。通常は1 Issue = 1 PRで完結する大きさにし、独立した成果が複数ある場合は分割します。
