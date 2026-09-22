@@ -112,3 +112,37 @@ func _count_filled_cells(board: Board) -> int:
 			if not board.is_cell_empty(x, y):
 				count += 1
 	return count
+
+
+func test_combo_ends_on_a_clearless_lock_but_b2b_survives() -> void:
+	# 要件定義 §34 / §35 の違いを、実際のプレイ経路で確かめる。
+	var i_seed: int = _find_seed_starting_with_i()
+	var rules := GameRules.create_default()
+	rules.gravity_cells_per_second = 0.0
+	var balance := GameBalance.create_default()
+	balance.b2b_clear_types = [LineClear.Type.SINGLE]  # 検証しやすいよう Single を対象にする
+	var session := PuzzleSession.new(rules, PieceRandomizer.new(i_seed), balance)
+	session.start(i_seed)
+
+	# 左端 1 列だけ空けた行を 1 本用意し、縦 I を落として Single で消す。
+	var board: Board = session.get_board()
+	for x in range(1, Board.WIDTH):
+		board.set_cell(x, Board.TOTAL_HEIGHT - 1, Piece.Type.I)
+
+	session.rotate(RotationSystem.Direction.CLOCKWISE)
+	_tap_move(session, AutoShift.Direction.LEFT, Board.WIDTH)
+	session.hard_drop()
+
+	assert_eq(session.get_combo_count(), 1, "1 回目の Clear で Combo 1")
+	assert_gt(session.get_b2b_chain(), 0, "B2B の鎖が始まる")
+
+	var combo_before: int = session.get_combo_count()
+	var chain_before: int = session.get_b2b_chain()
+
+	# 次の Piece を右端へ落とす。行は揃わない。
+	_tap_move(session, AutoShift.Direction.RIGHT, Board.WIDTH)
+	session.hard_drop()
+
+	assert_eq(session.get_combo_count(), 0, "Line Clear なしの Lock で Combo は終了する")
+	assert_eq(session.get_b2b_chain(), chain_before, "B2B は維持される")
+	assert_gt(combo_before, 0, "前提: Combo が立っていた")

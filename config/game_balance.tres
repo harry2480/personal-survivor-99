@@ -1,3 +1,10 @@
-[gd_resource type="Resource" format=3]
+[gd_resource type="Resource" script_class="GameBalance" format=3]
+
+[ext_resource type="Script" path="res://core/scoring/game_balance.gd" id="1_game_balance"]
 
 [resource]
+resource_name = "Game Balance"
+script = ExtResource("1_game_balance")
+b2b_clear_types = Array[int]([4])
+b2b_includes_t_spin = true
+combo_attack_table = PackedInt32Array(0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5)

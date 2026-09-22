@@ -5,9 +5,10 @@
 | ファイル | 内容 | 追加する Phase |
 |---|---|---|
 | `game_rules.tres` | Gravity / Lock Delay / DAS / ARR / Soft Drop Speed などのルール値 | Phase 1（#24 / #26） |
-| `game_balance.tres` | Line Attack / T-Spin Attack / Combo Table / B2B Bonus / Perfect Clear Attack / Garbage Delay / Multiplier | Phase 2（#28 / #30 / #31）、Phase 4（#37） |
+| `game_balance.tres` | Combo Table / B2B 対象 Clear（#28）、Line Attack / T-Spin Attack / B2B Bonus / Perfect Clear Attack / Garbage Delay / Multiplier は Phase 2〜4 で追加 | Phase 2（#28 / #30 / #31）、Phase 4（#37） |
 | `cpu_profiles.tres` | CPU Strength Mapping と Preset | Phase 5（#40）、Phase 6（#43 / #44） |
 | `defaults.json` | ユーザー設定の既定値 | Phase 9（#52） |
 
 数値をコードへ固定せず、ここで定義する（要件定義 §38）。
-現時点ではいずれも中身が空のプレースホルダー。
+`game_rules.tres` は Phase 1（#24 / #26）、`game_balance.tres` は #28 で中身が入った。
+`cpu_profiles.tres` は Phase 5 まで空のまま。
