@@ -10,56 +10,73 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: 検証
+  import:
+    name: Import / 起動検証
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: starter_templete
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d starter_templete"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/starter_templete?schema=public
-      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/starter_templete?schema=public
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: pnpm/action-setup@v4
+      # Godot のバージョンは .godot-version が唯一の参照元。ここでは複製しない。
+      - name: 固定バージョンを読み取る
+        id: godot
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < .godot-version)"
+          if [ -z "$version" ]; then
+            echo "::error::.godot-version が空です"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Godot $version を使用します"
+
+      - name: Godot をキャッシュ
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          version: 10.18.1
+          path: ~/godot
+          key: godot-linux-${{ steps.godot.outputs.version }}
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
+      - name: Godot を取得
+        env:
+          GODOT_RELEASE: ${{ steps.godot.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/godot
+          if [ -x "$HOME/godot/godot" ]; then
+            echo "キャッシュを使用します"
+          else
+            name="Godot_v${GODOT_RELEASE}_linux.x86_64"
+            url="https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/${name}.zip"
+            work="$(mktemp -d)"
+            curl -fsSL -o "${work}/${name}.zip" "$url"
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter webapp exec prisma migrate deploy
-      - run: pnpm verify
-      - run: pnpm build
+            # HTTPS は経路しか守らないため、リポジトリに固定した公式 SHA-512 で中身を検証する。
+            cp "${GITHUB_WORKSPACE}/ci/godot-checksums.txt" "${work}/checksums.txt"
+            ( cd "$work" && sha512sum --check --ignore-missing checksums.txt )
+
+            unzip -q "${work}/${name}.zip" -d ~/godot
+            mv "$HOME/godot/${name}" "$HOME/godot/godot"
+            chmod +x "$HOME/godot/godot"
+          fi
+          "$HOME/godot/godot" --version
+
+      # Godot はスクリプトエラーでも exit 0 を返すため、
+      # 出力を走査して失敗させるスクリプト経由で実行する。
+      - name: Import / 起動検証
+        run: GODOT_BIN="$HOME/godot/godot" scripts/verify-godot.sh
 
   ci-status:
     name: CI ステータス確認
     if: always()
-    needs: [verify]
+    needs: [import]
     runs-on: ubuntu-latest
     steps:
       - name: 検証の成功を確認
         env:
-          VERIFY_RESULT: ${{ needs.verify.result }}
+          IMPORT_RESULT: ${{ needs.import.result }}
         run: |
-          if [ "$VERIFY_RESULT" != "success" ]; then
-            echo "CI検証結果: $VERIFY_RESULT"
+          if [ "$IMPORT_RESULT" != "success" ]; then
+            echo "CI検証結果: $IMPORT_RESULT"
             exit 1
           fi
           echo "CI検証に成功しました"

@@ -1,0 +1,7 @@
+{
+  "_comment": "既定値の置き場。実際の値は各 Phase で追加する（要件定義 §39 Game Balance Data / §97 Settings）。",
+  "gameplay": {},
+  "audio": {},
+  "video": {},
+  "input": {}
+}
