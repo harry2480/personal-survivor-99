@@ -55,12 +55,32 @@ Godot はスクリプトエラーが出ても終了コード 0 を返すため�
 GODOT_BIN=/path/to/godot scripts/verify-godot.sh
 ```
 
+## テスト
+
+自動テストは [GUT](https://github.com/bitwes/Gut) で書き、`godot --headless` で実行する。
+GUT は `addons/gut/` にバージョン固定で同梱している（[addons/README.md](addons/README.md)）。
+
+```sh
+# tests/ 配下をすべて実行する
+scripts/run-tests.sh
+
+# ディレクトリやテスト名を絞る（GUT のオプションをそのまま渡せる）
+scripts/run-tests.sh -gdir=res://tests/core
+scripts/run-tests.sh -gunit_test_name=test_seeded_rng_is_reproducible
+```
+
+テストが 1 件でも失敗すると非 0 の終了コードで終わる。実行対象ディレクトリなどの
+既定値は `.gutconfig.json` に定義する。
+
+テストの書き方と対象は [テストガイドライン.md](docs/テストガイドライン.md) を参照。
+
 ## ディレクトリ構成
 
 [要件定義.md](docs/要件定義.md) §119 に従う。
 
 ```text
 project.godot
+├── addons/     # 外部アドオン（GUT）
 ├── assets/     # フォント・画像・音源・テーマ
 ├── core/       # Game Core Layer（Board / Piece / Rotation / Scoring / Attack / Garbage / Rules）
 ├── battle/     # Battle Layer（BattlePlayer / Target / Garbage Routing / KO / Rank / Multiplier）

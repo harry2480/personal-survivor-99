@@ -12,38 +12,11 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-godot_bin="${GODOT_BIN:-}"
-if [ -z "$godot_bin" ]; then
-  if command -v godot >/dev/null 2>&1; then
-    godot_bin="$(command -v godot)"
-  elif [ -x /Applications/Godot.app/Contents/MacOS/Godot ]; then
-    godot_bin=/Applications/Godot.app/Contents/MacOS/Godot
-  else
-    echo "Godot が見つかりません。GODOT_BIN で実行ファイルを指定してください。" >&2
-    exit 1
-  fi
-fi
+# shellcheck source=lib/godot-env.sh
+. "$repo_root/scripts/lib/godot-env.sh"
 
-pinned="$(tr -d '[:space:]' < .godot-version)"
-if [ -z "$pinned" ]; then
-  echo ".godot-version が空です。固定する Godot のバージョンを記述してください。" >&2
-  exit 1
-fi
-actual="$("$godot_bin" --version | head -n 1)"
-if [ "${SKIP_GODOT_VERSION_CHECK:-0}" != "1" ]; then
-  # .godot-version は "4.7.2-stable"、--version は "4.7.2.stable.official.xxxxxxx"
-  expected="${pinned/-/.}"
-  case "$actual" in
-    "$expected"*) ;;
-    *)
-      echo "Godot のバージョンが固定値と一致しません。" >&2
-      echo "  .godot-version: $pinned" >&2
-      echo "  実行ファイル:   $actual" >&2
-      echo "意図的に別バージョンを使う場合は SKIP_GODOT_VERSION_CHECK=1 を指定してください。" >&2
-      exit 1
-      ;;
-  esac
-fi
+godot_bin="$(resolve_godot_bin)"
+actual="$(assert_godot_version "$godot_bin" "$repo_root")"
 
 echo "Godot: $actual"
 echo

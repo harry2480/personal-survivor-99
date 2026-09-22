@@ -26,3 +26,7 @@ window/stretch/aspect="keep"
 [rendering]
 
 renderer/rendering_method="mobile"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")

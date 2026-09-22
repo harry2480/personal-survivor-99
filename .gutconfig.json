@@ -1,0 +1,14 @@
+{
+  "dirs": [
+    "res://tests/core",
+    "res://tests/battle",
+    "res://tests/cpu",
+    "res://tests/integration"
+  ],
+  "include_subdirs": true,
+  "prefix": "test_",
+  "suffix": ".gd",
+  "log_level": 1,
+  "disable_colors": true,
+  "should_exit": true
+}
