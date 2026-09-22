@@ -1,6 +1,10 @@
 {
-  "_comment": "既定値の置き場。実際の値は各 Phase で追加する（要件定義 §39 Game Balance Data / §97 Settings）。",
-  "gameplay": {},
+  "_comment": "ユーザー設定の既定値（要件定義 §39 Game Balance Data / §97 Settings）。gameplay の値は GameRules.apply_user_settings() で上書きに使う。",
+  "gameplay": {
+    "das_sec": 0.167,
+    "arr_sec": 0.033,
+    "soft_drop_multiplier": 20.0
+  },
   "audio": {},
   "video": {},
   "input": {}

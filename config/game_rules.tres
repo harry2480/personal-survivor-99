@@ -6,6 +6,10 @@
 resource_name = "Game Rules"
 script = ExtResource("1_game_rules")
 gravity_cells_per_second = 1.0
+soft_drop_multiplier = 20.0
+hard_drop_locks_immediately = true
+das_sec = 0.167
+arr_sec = 0.033
 lock_delay_sec = 0.5
 lock_delay_reset_on_move = true
 lock_delay_reset_on_rotate = true
