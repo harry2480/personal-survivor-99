@@ -4,6 +4,7 @@
 .godot/
 /export/
 /build/
+/dist/
 
 # エディタ / ローカル設定
 .vscode/settings.json
