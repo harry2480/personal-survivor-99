@@ -22,10 +22,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		if not InputMap.has_action(action_name):
 			continue
 
-		if event.is_action_pressed(action_name, false, true):
+		# exact_match は指定しない。Input Action に修飾キーを設定していないため、
+		# ← を押したまま Shift を足して離すと、release 側だけ完全一致に失敗して
+		# 押しっぱなし扱いが残る（要件定義 §15 の Keyboard Mapping は修飾キーなし）。
+		if event.is_action_pressed(action_name, false):
 			_set_pressed(command, true)
 			get_viewport().set_input_as_handled()
-		elif event.is_action_released(action_name, true):
+		elif event.is_action_released(action_name):
 			_set_pressed(command, false)
 			get_viewport().set_input_as_handled()
 
