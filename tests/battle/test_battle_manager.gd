@@ -153,6 +153,38 @@ func test_no_further_updates_after_finishing() -> void:
 	assert_true(manager.is_finished(), "終了状態のまま")
 
 
+func test_battle_with_one_player_finishes_at_setup() -> void:
+	watch_signals(manager)
+	manager.setup(1, 0, SEED)
+
+	assert_true(manager.is_finished(), "1 人で始めたら即終了")
+	assert_eq(manager.get_player(0).rank, 1, "唯一の Player が Rank 1")
+	assert_signal_emitted_with_parameters(manager, "battle_finished", [0])
+
+
+func test_battle_with_one_player_does_not_advance_the_session() -> void:
+	var rules := GameRules.create_default()
+	manager = BattleManager.new(rules)
+	manager.setup(1, 0, SEED)
+	var piece_before: Vector2i = manager.get_player(0).session.get_active_piece().position
+
+	manager.update(10.0)
+
+	assert_eq(
+		manager.get_player(0).session.get_active_piece().position,
+		piece_before,
+		"終了後は Session を進めない"
+	)
+
+
+func test_battle_with_no_players_finishes_without_winner() -> void:
+	watch_signals(manager)
+	manager.setup(0, 0, SEED)
+
+	assert_true(manager.is_finished(), "0 人なら即終了")
+	assert_signal_emitted_with_parameters(manager, "battle_finished", [-1])
+
+
 # --- Battle Phase（要件定義 §93） -------------------------------------------
 
 

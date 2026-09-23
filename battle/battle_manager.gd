@@ -50,6 +50,8 @@ func setup(human_count: int, cpu_count: int, battle_seed: int = 0) -> void:
 		add_player(PlayerType.Type.CPU)
 
 	_phase = BattlePhase.from_alive_count(get_alive_count())
+	# 0 人・1 人で始めた Battle は、この時点で決着している。
+	_check_finished()
 
 
 ## Player を 1 人追加し、一意の ID を付けて返す。
