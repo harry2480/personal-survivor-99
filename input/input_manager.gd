@@ -16,6 +16,13 @@ signal command_released(command: GameCommand.Command)
 var _pressed: Dictionary = {}
 
 
+func _notification(what: int) -> void:
+	# Window から外れると、押しっぱなしのキーの解放イベントが来ないことがある。
+	# そのまま放置すると移動や Soft Drop が続くため、ここで解除して signal を出す。
+	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		release_all()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	for command in GameCommand.get_all_commands():
 		var action_name: String = GameCommand.get_action_name(command)

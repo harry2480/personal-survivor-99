@@ -149,7 +149,8 @@ func test_combo_ends_on_a_clearless_lock_but_b2b_survives() -> void:
 
 
 func test_single_clear_sends_no_attack_by_default() -> void:
-	# 最下段 1 行だけ左端を空け、縦 I で消す。盤面が空になり Perfect Clear が成立する。
+	# 最下段 1 行だけ左端を空け、縦 I で消す。縦 I の残り 3 マスが上に残るため、
+	# 行は消えるが Perfect Clear にはならない。
 	var i_seed: int = _find_seed_starting_with_i()
 	var rules := GameRules.create_default()
 	rules.gravity_cells_per_second = 0.0
@@ -173,10 +174,14 @@ func test_single_clear_sends_no_attack_by_default() -> void:
 
 
 func test_perfect_clear_is_reported_when_the_board_empties() -> void:
+	# 横向きの I は 4 マスすべてが同じ行に入るため、最下段の残り 6 列を埋めれば
+	# 必ず盤面が空になる。Piece の形に結果が左右されないよう Seed を固定する。
+	var i_seed: int = _find_seed_starting_with_i()
 	var rules := GameRules.create_default()
 	rules.gravity_cells_per_second = 0.0
-	var session := PuzzleSession.new(rules, PieceRandomizer.new(SEED))
-	session.start(SEED)
+	var session := PuzzleSession.new(rules, PieceRandomizer.new(i_seed))
+	session.start(i_seed)
+	assert_eq(session.get_active_piece().type, Piece.Type.I as int, "前提: I が出ている")
 
 	# 現在の Piece が着地したときに、その 4 マスだけで 1 行が揃うよう盤面を作る。
 	var piece: ActivePiece = session.get_active_piece()
@@ -199,8 +204,38 @@ func test_perfect_clear_is_reported_when_the_board_empties() -> void:
 	watch_signals(session)
 	session.hard_drop()
 
-	if PerfectClear.is_board_empty(board):
-		assert_signal_emitted(session, "perfect_clear_achieved", "盤面が空になれば通知される")
-	else:
-		# Piece の形によっては上の行に残るため、その場合は Attack だけを確認する。
-		assert_signal_emitted(session, "attack_generated", "行が消えれば Attack は発生する")
+	assert_true(PerfectClear.is_board_empty(board), "前提: 盤面が空になる")
+	assert_signal_emitted(session, "perfect_clear_achieved", "盤面が空になれば通知される")
+	assert_signal_emitted(session, "attack_generated", "Perfect Clear では Attack が発生する")
+
+
+func test_last_attack_is_cleared_by_a_lock_without_attack() -> void:
+	# get_last_attack() は「直前の Lock で発生した Attack」。Attack が出ない Lock の
+	# 後に前回の値が残ると、UI や Battle Layer が誤った量を読む。
+	var i_seed: int = _find_seed_starting_with_i()
+	var rules := GameRules.create_default()
+	rules.gravity_cells_per_second = 0.0
+	var session := PuzzleSession.new(rules, PieceRandomizer.new(i_seed))
+	session.start(i_seed)
+
+	var board: Board = session.get_board()
+	var piece: ActivePiece = session.get_active_piece()
+	var landing_cells: Array[Vector2i] = GhostPiece.get_landing_cells(
+		board, piece.type, piece.rotation, piece.position
+	)
+	var occupied_columns: Dictionary = {}
+	var bottom: int = Board.TOTAL_HEIGHT - 1
+	for cell in landing_cells:
+		if cell.y == bottom:
+			occupied_columns[cell.x] = true
+	for x in range(Board.WIDTH):
+		if not occupied_columns.has(x):
+			board.set_cell(x, bottom, Piece.Type.I)
+
+	session.hard_drop()
+	assert_gt(session.get_last_attack(), 0, "前提: Perfect Clear で Attack が出る")
+
+	# 次の Piece を落とす。盤面は空なので行は揃わず、Attack は発生しない。
+	session.hard_drop()
+
+	assert_eq(session.get_last_attack(), 0, "Attack が出ない Lock では 0 に戻る")

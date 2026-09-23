@@ -42,6 +42,11 @@ func advance(delta_sec: float) -> int:
 	return _gravity.advance(delta_sec)
 
 
+## 溜まっている落下の端数（マス）を返す。着地までの時間を求めるのに使う。
+func get_accumulated_cells() -> float:
+	return _gravity.get_accumulated_cells()
+
+
 ## 新しい Piece の操作を始めるときに呼ぶ。溜まっている端数を捨てる。
 func start_new_piece() -> void:
 	_gravity.reset()

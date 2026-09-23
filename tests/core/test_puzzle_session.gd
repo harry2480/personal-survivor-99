@@ -73,13 +73,16 @@ func test_lock_delay_locks_after_the_configured_time() -> void:
 	session.hard_drop()  # 1 つ目を置いて 2 つ目に移る
 	var piece_before: ActivePiece = session.get_active_piece()
 	DropSystem.hard_drop(session.get_board(), piece_before)
-	var type_before: int = piece_before.type
+	var filled_before: int = _count_filled_cells()
 
 	session.update(0.4)
-	assert_eq(session.get_active_piece().type, type_before, "猶予中は Lock しない")
+	assert_eq(_count_filled_cells(), filled_before, "猶予中は Lock しない")
 
+	watch_signals(session)
 	session.update(0.2)
-	assert_ne(session.get_active_piece().type, -1, "Lock 後は次の Piece が出ている")
+
+	assert_signal_emitted(session, "piece_locked", "猶予を過ぎたら Lock される")
+	assert_eq(_count_filled_cells(), filled_before + 4, "Lock した 4 マスが盤面に増える")
 
 
 # --- 操作 ------------------------------------------------------------------
@@ -311,3 +314,39 @@ func test_falling_after_rotating_clears_the_rotation_flag() -> void:
 	session.hard_drop()
 
 	assert_false(detector.last_context.last_action_was_rotation, "落下でも回転扱いではなくなる")
+
+
+func test_lock_delay_does_not_count_time_spent_falling() -> void:
+	# 着地前の時間まで Lock Delay に入れると、大きい delta では着地した瞬間に
+	# Lock してしまう（要件定義 §29 / §30）。
+	var falling_rules := GameRules.create_default()
+	falling_rules.gravity_cells_per_second = 1.0
+	falling_rules.lock_delay_sec = 0.5
+	var falling := PuzzleSession.new(falling_rules, PieceRandomizer.new(SEED))
+	falling.start(SEED)
+
+	var piece: ActivePiece = falling.get_active_piece()
+	var landing: Vector2i = GhostPiece.get_landing_position(
+		falling.get_board(), piece.type, piece.rotation, piece.position
+	)
+	var distance: int = landing.y - piece.position.y
+	assert_gt(distance, 0, "前提: 空中から始まる")
+
+	# 落下に distance 秒かかるので、着地後に経過するのは 0.1 秒だけ。
+	falling.update(float(distance) + 0.1)
+
+	assert_eq(_count_filled_cells_of(falling), 0, "着地して 0.1 秒では Lock しない")
+
+	falling.update(0.5)
+
+	assert_eq(_count_filled_cells_of(falling), 4, "猶予を過ぎたら Lock する")
+
+
+func _count_filled_cells_of(target: PuzzleSession) -> int:
+	var count: int = 0
+	var board: Board = target.get_board()
+	for y in range(Board.TOTAL_HEIGHT):
+		for x in range(Board.WIDTH):
+			if not board.is_cell_empty(x, y):
+				count += 1
+	return count

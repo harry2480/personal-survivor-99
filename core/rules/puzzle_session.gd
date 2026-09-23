@@ -93,8 +93,10 @@ func update(delta_sec: float) -> void:
 		return
 
 	_apply_auto_shift(delta_sec)
-	_apply_gravity(delta_sec)
-	_apply_lock_delay(delta_sec)
+	# 着地までに使った時間は Lock Delay に含めない。含めると、同じ実時間でも
+	# delta の刻み方で Lock のタイミングが変わる（要件定義 §29 / §30）。
+	var airborne_sec: float = _apply_gravity(delta_sec)
+	_apply_lock_delay(delta_sec - airborne_sec)
 
 
 # --- 操作 ------------------------------------------------------------------
@@ -281,14 +283,38 @@ func _move_horizontally(step_x: int, steps: int) -> void:
 		_clear_rotation_flag()
 
 
-func _apply_gravity(delta_sec: float) -> void:
+## 重力を適用し、この delta のうち「着地するまでに使った時間（秒）」を返す。
+##
+## 接地したまま始まった場合は 0.0。最後まで空中にいた場合は delta 全部。
+func _apply_gravity(delta_sec: float) -> float:
+	var distance_to_ground: int = _get_distance_to_ground()
+	var speed: float = _drop.get_current_speed()
+	var carried_cells: float = _drop.get_accumulated_cells()
+
 	var cells: int = _drop.advance(delta_sec)
+	var moved: int = 0
 	for _i in range(cells):
 		var candidate: Vector2i = _piece.position + Vector2i.DOWN
 		if not Collision.can_place(_board, _piece.type, _piece.rotation, candidate):
 			break
 		_piece.position = candidate
 		_clear_rotation_flag()
+		moved += 1
+
+	if distance_to_ground <= 0:
+		return 0.0
+	if moved < distance_to_ground or speed <= 0.0:
+		return delta_sec
+
+	# 累積が distance_to_ground に達した時点が着地の瞬間。
+	return clampf((float(distance_to_ground) - carried_cells) / speed, 0.0, delta_sec)
+
+
+func _get_distance_to_ground() -> int:
+	var landing: Vector2i = GhostPiece.get_landing_position(
+		_board, _piece.type, _piece.rotation, _piece.position
+	)
+	return landing.y - _piece.position.y
 
 
 func _apply_lock_delay(delta_sec: float) -> void:
@@ -299,6 +325,8 @@ func _apply_lock_delay(delta_sec: float) -> void:
 
 func _lock_piece() -> void:
 	var locked_type: int = _piece.type
+	# 「直前の Lock で発生した Attack」なので、Attack が出ない Lock では 0 に戻す。
+	_last_attack = 0
 	var t_spin: TSpinDetector.Result = _detect_t_spin()
 	if t_spin != TSpinDetector.Result.NONE:
 		t_spin_detected.emit(t_spin)
@@ -321,8 +349,8 @@ func _lock_piece() -> void:
 
 		var context: AttackContext = AttackContext.create(result, _scoring, is_perfect_clear)
 		var attack: int = _attack_calculator.calculate(context)
+		_last_attack = attack
 		if attack > 0:
-			_last_attack = attack
 			attack_generated.emit(attack, context)
 
 	_hold.on_piece_locked()
