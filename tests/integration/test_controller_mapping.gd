@@ -43,13 +43,15 @@ func test_keyboard_bindings_are_kept() -> void:
 
 
 func test_standard_mapping_follows_the_requirement() -> void:
+	# Godot の JOY_BUTTON_A / B は位置（下 / 右）を表す。Pro Controller では
+	# 下が B、右が A なので、§14 の「A → Rotate Right」は JOY_BUTTON_B になる。
 	var expected: Dictionary = {
 		"move_left": JOY_BUTTON_DPAD_LEFT,
 		"move_right": JOY_BUTTON_DPAD_RIGHT,
 		"soft_drop": JOY_BUTTON_DPAD_DOWN,
 		"hard_drop": JOY_BUTTON_DPAD_UP,
-		"rotate_right": JOY_BUTTON_A,
-		"rotate_left": JOY_BUTTON_B,
+		"rotate_right": JOY_BUTTON_B,
+		"rotate_left": JOY_BUTTON_A,
 		"pause": JOY_BUTTON_START,
 	}
 	for action_name in expected:
@@ -58,6 +60,14 @@ func test_standard_mapping_follows_the_requirement() -> void:
 			if event is InputEventJoypadButton:
 				buttons.append(event.button_index)
 		assert_true(expected[action_name] in buttons, "%s の割り当てが §14 どおり" % action_name)
+
+
+func test_controller_bindings_accept_every_device() -> void:
+	# device を 0 に固定すると、2 台目以降に割り当てられた Controller が反応しない。
+	for command in CONTROLLER_COMMANDS:
+		var action_name: String = GameCommand.get_action_name(command)
+		for event in _joypad_events(action_name):
+			assert_eq(event.device, -1, "%s の Controller 割り当ては全デバイスで有効" % action_name)
 
 
 func test_hold_accepts_both_shoulders() -> void:
