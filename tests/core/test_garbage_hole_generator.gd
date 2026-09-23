@@ -56,6 +56,18 @@ func test_no_repeat_mode_never_repeats_consecutively() -> void:
 			assert_ne(holes[index], holes[index - 1], "連続して同じ列にはしない")
 
 
+func test_no_repeat_mode_never_repeats_across_events() -> void:
+	# 1 行ずつ別の Garbage が来ると、行は別の Event にまたがる。前の Event の最後の
+	# 穴と同じ列が続けて開くと「前回と同じ列は選ばない」方式として成立しない。
+	var generator := GarbageHoleGenerator.new(GarbageHoleGenerator.Mode.PER_LINE_NO_REPEAT, SEED_A)
+	var previous: int = generator.generate(1)[0]
+
+	for _attempt in range(40):
+		var hole: int = generator.generate(1)[0]
+		assert_ne(hole, previous, "Event をまたいでも続けて同じ列にはしない")
+		previous = hole
+
+
 func test_same_seed_produces_the_same_holes() -> void:
 	var first := GarbageHoleGenerator.new(GarbageHoleGenerator.Mode.PER_LINE, SEED_A)
 	var second := GarbageHoleGenerator.new(GarbageHoleGenerator.Mode.PER_LINE, SEED_A)

@@ -57,7 +57,13 @@ func generate(line_count: int) -> PackedInt32Array:
 	if line_count <= 0:
 		return holes
 
-	var shared_x: int = _pick_column()
+	# PER_LINE_NO_REPEAT は Event をまたいでも直前の列を避ける。先に _pick_column() を
+	# 呼ぶと _last_hole_x が上書きされ、先頭行だけ前回と同じ列になりうる。
+	var shared_x: int = (
+		_pick_column_avoiding_last()
+		if _mode == Mode.PER_LINE_NO_REPEAT and _last_hole_x >= 0
+		else _pick_column()
+	)
 	for index in range(line_count):
 		match _mode:
 			Mode.SAME_COLUMN_PER_EVENT:

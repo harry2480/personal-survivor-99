@@ -76,7 +76,9 @@ func get_soft_drop_speed() -> float:
 
 ## ユーザー設定で上書きする（要件定義 §97）。
 ##
-## 対象は操作感に関わる値だけ。知らないキーは無視し、不正な値は採用しない。
+## 対象は Gameplay の値だけ（要件定義 §97）。Dead Zone のような Input の設定は
+## Game Core の持ち物ではないため、[method InputManager.apply_user_settings] が扱う。
+## 知らないキーは無視し、不正な値は採用しない。
 ## Game Core は FileSystem を知らないため（§17）、設定の読み込みは上位層が行い、
 ## ここには [Dictionary] として渡す。
 ##

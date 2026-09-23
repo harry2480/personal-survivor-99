@@ -13,7 +13,26 @@ signal command_pressed(command: GameCommand.Command)
 ## コマンドが離された。
 signal command_released(command: GameCommand.Command)
 
+## Controller が接続された（Device Detection。要件定義 §13）。
+signal device_connected(device_id: int, device_name: String)
+
+## Controller が切断された。切断後の扱いは #33 で詰める。
+signal device_disconnected(device_id: int, device_name: String)
+
+## Stick 入力のしきい値（Dead Zone）の既定値（要件定義 §14 / §97 Input）。
+##
+## Dead Zone は Controller の設定なので Game Core では持たない（要件定義 §17）。
+## ユーザー設定での上書きは [method apply_user_settings] から行う。
+const DEFAULT_DEAD_ZONE: float = 0.5
+
 var _pressed: Dictionary = {}
+var _device_names: Dictionary = {}
+
+
+func _ready() -> void:
+	Input.joy_connection_changed.connect(_on_joy_connection_changed)
+	for device_id in Input.get_connected_joypads():
+		_device_names[device_id] = Input.get_joy_name(device_id)
 
 
 func _notification(what: int) -> void:
@@ -52,12 +71,69 @@ func release_all() -> void:
 			_set_pressed(command, false)
 
 
+## Stick 入力のしきい値（Dead Zone）を全 Action へ適用する（要件定義 §14）。
+##
+## Controller の個体差を吸収するため、実行時に変更できるようにしている。
+static func apply_dead_zone(dead_zone: float) -> void:
+	var value: float = clampf(dead_zone, 0.0, 0.99)
+	for command in GameCommand.get_all_commands():
+		var action_name: String = GameCommand.get_action_name(command)
+		if InputMap.has_action(action_name):
+			InputMap.action_set_deadzone(action_name, value)
+
+
+## ユーザー設定のうち Input に属するものを反映する（要件定義 §97 Input）。
+##
+## 知らないキーは無視し、不正な値は採用しない。反映できたキーの数を返す。
+static func apply_user_settings(settings: Dictionary) -> int:
+	var applied: int = 0
+
+	if _is_dead_zone(settings.get("stick_dead_zone")):
+		apply_dead_zone(float(settings["stick_dead_zone"]))
+		applied += 1
+
+	return applied
+
+
+static func _is_dead_zone(value: Variant) -> bool:
+	if typeof(value) != TYPE_FLOAT and typeof(value) != TYPE_INT:
+		return false
+	return float(value) >= 0.0 and float(value) < 1.0
+
+
+## 接続されている Controller の ID を返す。
+func get_connected_devices() -> Array[int]:
+	var devices: Array[int] = []
+	for device_id in _device_names:
+		devices.append(device_id)
+	return devices
+
+
+## Controller が 1 台でも接続されているかを返す。
+func has_connected_device() -> bool:
+	return not _device_names.is_empty()
+
+
 ## Input Action がすべて登録されているかを返す。起動時の検証に使う。
 static func has_all_actions() -> bool:
 	for command in GameCommand.get_all_commands():
 		if not InputMap.has_action(GameCommand.get_action_name(command)):
 			return false
 	return true
+
+
+func _on_joy_connection_changed(device_id: int, connected: bool) -> void:
+	if connected:
+		var device_name: String = Input.get_joy_name(device_id)
+		_device_names[device_id] = device_name
+		device_connected.emit(device_id, device_name)
+		return
+
+	var previous_name: String = _device_names.get(device_id, "")
+	_device_names.erase(device_id)
+	# 押されたままのコマンドを残すと、切断後に動き続けてしまう。
+	release_all()
+	device_disconnected.emit(device_id, previous_name)
 
 
 func _set_pressed(command: GameCommand.Command, pressed: bool) -> void:

@@ -90,6 +90,9 @@ func start(game_seed: int = 0) -> void:
 	_drop.set_soft_dropping(false)
 	_scoring.reset()
 	_garbage_queue.clear()
+	# Attack ID も初期状態へ戻す。残っていると、同じ操作列でも再開の前後で
+	# 同時刻 Event の順序が変わる（要件定義 §110 / §111）。
+	_next_attack_id = 0
 	_hole_generator.reset(game_seed)
 	_game_time_sec = 0.0
 	_is_over = false

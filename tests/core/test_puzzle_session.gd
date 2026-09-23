@@ -25,6 +25,18 @@ func _fill_row_except(y: int, open_x: int) -> void:
 # --- 開始と出現 ------------------------------------------------------------
 
 
+func test_restart_numbers_the_attack_ids_from_the_start() -> void:
+	# start() は初期状態へ戻す。簡易受信の Attack ID が残ると、同じ操作列でも再開の
+	# 前後で同時刻 Event の順序が変わり、Seed から結果が決まらなくなる（§110 / §111）。
+	session.receive_garbage_lines(1)
+	var first: int = session.get_garbage_queue().peek_all()[0].attack_id
+
+	session.start(SEED)
+	session.receive_garbage_lines(1)
+
+	assert_eq(session.get_garbage_queue().peek_all()[0].attack_id, first, "再開後も同じ番号から採番する")
+
+
 func test_starts_with_an_active_piece() -> void:
 	assert_true(session.get_active_piece().is_active(), "Piece が出ている")
 	assert_false(session.is_over(), "まだ終わっていない")
