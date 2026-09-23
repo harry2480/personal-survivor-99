@@ -20,6 +20,9 @@ extends Resource
 ## 秒にもマス数にも使う（どちらも 1 に対して十分小さい）。
 const ACCUMULATION_EPSILON: float = 0.000001
 
+## Soft Drop 倍率の下限。1.0 未満は Soft Drop で遅くなるため受け付けない。
+const MINIMUM_SOFT_DROP_MULTIPLIER: float = 1.0
+
 ## 1 秒あたりに落下するマス数。
 @export_range(0.0, 60.0, 0.01, "or_greater") var gravity_cells_per_second: float = 1.0
 
@@ -81,7 +84,9 @@ func get_soft_drop_speed() -> float:
 func apply_user_settings(settings: Dictionary) -> int:
 	var applied: int = 0
 
-	if _is_positive_number(settings.get("soft_drop_multiplier")):
+	# Soft Drop は通常落下より速いことが前提（要件定義 §27）。1.0 未満は
+	# 「押すと遅くなる」設定になるため採用しない（@export_range の下限と揃える）。
+	if _is_number_at_least(settings.get("soft_drop_multiplier"), MINIMUM_SOFT_DROP_MULTIPLIER):
 		soft_drop_multiplier = float(settings["soft_drop_multiplier"])
 		applied += 1
 	if _is_non_negative_number(settings.get("das_sec")):
@@ -94,8 +99,8 @@ func apply_user_settings(settings: Dictionary) -> int:
 	return applied
 
 
-static func _is_positive_number(value: Variant) -> bool:
-	return _is_number(value) and float(value) > 0.0
+static func _is_number_at_least(value: Variant, minimum: float) -> bool:
+	return _is_number(value) and float(value) >= minimum
 
 
 static func _is_non_negative_number(value: Variant) -> bool:

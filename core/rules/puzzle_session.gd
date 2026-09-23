@@ -25,6 +25,12 @@ signal piece_held(held_type: int)
 ## T-Spin と判定された（[enum TSpinDetector.Result]）。
 signal t_spin_detected(result: int)
 
+## Perfect Clear が成立した。
+signal perfect_clear_achieved
+
+## Attack が発生した。送り先の決定は Battle Layer の責務（Phase 4）。
+signal attack_generated(amount: int, context: AttackContext)
+
 ## Top Out した（Spawn できなかった）。
 signal topped_out
 
@@ -39,12 +45,14 @@ var _drop: DropSystem
 var _auto_shift: AutoShift
 var _lock_delay: LockDelay
 var _scoring: ScoringState
+var _attack_calculator: AttackCalculator
 var _t_spin_detector: TSpinDetector
 var _last_action_was_rotation: bool = false
 var _last_kick_index: int = -1
 var _last_kick_table_size: int = 0
 var _is_over: bool = false
 var _cleared_lines_total: int = 0
+var _last_attack: int = 0
 
 
 func _init(
@@ -61,6 +69,7 @@ func _init(
 	_auto_shift = AutoShift.new(_rules)
 	_lock_delay = LockDelay.new(_rules)
 	_scoring = ScoringState.new(_balance)
+	_attack_calculator = AttackCalculator.new(_balance)
 	_t_spin_detector = TSpinDetector.new()
 
 
@@ -74,6 +83,7 @@ func start(game_seed: int = 0) -> void:
 	_scoring.reset()
 	_is_over = false
 	_cleared_lines_total = 0
+	_last_attack = 0
 	_spawn_next()
 
 
@@ -83,8 +93,10 @@ func update(delta_sec: float) -> void:
 		return
 
 	_apply_auto_shift(delta_sec)
-	_apply_gravity(delta_sec)
-	_apply_lock_delay(delta_sec)
+	# 着地までに使った時間は Lock Delay に含めない。含めると、同じ実時間でも
+	# delta の刻み方で Lock のタイミングが変わる（要件定義 §29 / §30）。
+	var airborne_sec: float = _apply_gravity(delta_sec)
+	_apply_lock_delay(delta_sec - airborne_sec)
 
 
 # --- 操作 ------------------------------------------------------------------
@@ -203,6 +215,11 @@ func get_cleared_lines_total() -> int:
 	return _cleared_lines_total
 
 
+## 直前の Lock で発生した Attack を返す。
+func get_last_attack() -> int:
+	return _last_attack
+
+
 ## Combo / Back-to-Back / 直前の T-Spin をまとめた状態を返す。
 ##
 ## Attack 計算（#30）はこれをそのまま入力にする。
@@ -266,14 +283,38 @@ func _move_horizontally(step_x: int, steps: int) -> void:
 		_clear_rotation_flag()
 
 
-func _apply_gravity(delta_sec: float) -> void:
+## 重力を適用し、この delta のうち「着地するまでに使った時間（秒）」を返す。
+##
+## 接地したまま始まった場合は 0.0。最後まで空中にいた場合は delta 全部。
+func _apply_gravity(delta_sec: float) -> float:
+	var distance_to_ground: int = _get_distance_to_ground()
+	var speed: float = _drop.get_current_speed()
+	var carried_cells: float = _drop.get_accumulated_cells()
+
 	var cells: int = _drop.advance(delta_sec)
+	var moved: int = 0
 	for _i in range(cells):
 		var candidate: Vector2i = _piece.position + Vector2i.DOWN
 		if not Collision.can_place(_board, _piece.type, _piece.rotation, candidate):
 			break
 		_piece.position = candidate
 		_clear_rotation_flag()
+		moved += 1
+
+	if distance_to_ground <= 0:
+		return 0.0
+	if moved < distance_to_ground or speed <= 0.0:
+		return delta_sec
+
+	# 累積が distance_to_ground に達した時点が着地の瞬間。
+	return clampf((float(distance_to_ground) - carried_cells) / speed, 0.0, delta_sec)
+
+
+func _get_distance_to_ground() -> int:
+	var landing: Vector2i = GhostPiece.get_landing_position(
+		_board, _piece.type, _piece.rotation, _piece.position
+	)
+	return landing.y - _piece.position.y
 
 
 func _apply_lock_delay(delta_sec: float) -> void:
@@ -284,6 +325,8 @@ func _apply_lock_delay(delta_sec: float) -> void:
 
 func _lock_piece() -> void:
 	var locked_type: int = _piece.type
+	# 「直前の Lock で発生した Attack」なので、Attack が出ない Lock では 0 に戻す。
+	_last_attack = 0
 	var t_spin: TSpinDetector.Result = _detect_t_spin()
 	if t_spin != TSpinDetector.Result.NONE:
 		t_spin_detected.emit(t_spin)
@@ -299,6 +342,16 @@ func _lock_piece() -> void:
 	if result.has_cleared():
 		_cleared_lines_total += result.line_count
 		lines_cleared.emit(result)
+
+		var is_perfect_clear: bool = PerfectClear.is_achieved(_board, result.line_count)
+		if is_perfect_clear:
+			perfect_clear_achieved.emit()
+
+		var context: AttackContext = AttackContext.create(result, _scoring, is_perfect_clear)
+		var attack: int = _attack_calculator.calculate(context)
+		_last_attack = attack
+		if attack > 0:
+			attack_generated.emit(attack, context)
 
 	_hold.on_piece_locked()
 	_spawn_next()

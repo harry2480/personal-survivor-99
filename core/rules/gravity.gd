@@ -37,11 +37,15 @@ func advance(delta_sec: float) -> int:
 	# 誤差でちょうど 1 マスに届かないことがあるため、許容差を足してから切り捨てる。
 	# これがないと、同じ実時間でも delta の刻み方で落下量が 1 マスずれる。
 	var cells: int = int(_accumulated_cells + GameRules.ACCUMULATION_EPSILON)
-	_accumulated_cells = maxf(0.0, _accumulated_cells - float(cells))
+
+	# 許容差で繰り上げたぶんは、わずかに負の端数として残る。0 で丸めて捨てると
+	# 刻むたびに許容差ぶんを得することになり、delta の分け方で落下量が変わる。
+	# 次回へ繰り越して返す（借りたぶんを返す）。
+	_accumulated_cells -= float(cells)
 	return cells
 
 
-## 溜まっている端数を返す（0.0 以上 1.0 未満）。
+## 溜まっている端数を返す（1.0 未満。許容差で繰り上げた直後はわずかに負になる）。
 func get_accumulated_cells() -> float:
 	return _accumulated_cells
 

@@ -107,3 +107,18 @@ func test_same_delta_sequence_produces_the_same_result() -> void:
 
 	for delta in deltas:
 		assert_eq(first.advance(delta), second.advance(delta), "同じ delta 列からは同じ落下量")
+
+
+func test_splitting_the_delta_does_not_change_the_total_cells() -> void:
+	# 許容差で繰り上げたぶんを捨てると、刻むたびに得をして落下量がずれる。
+	var split := Gravity.new(20.0)
+	var whole := Gravity.new(20.0)
+	var slice: float = 0.049999975
+
+	var split_cells: int = 0
+	for _i in range(3):
+		split_cells += split.advance(slice)
+
+	var whole_cells: int = whole.advance(slice * 3.0)
+
+	assert_eq(split_cells, whole_cells, "3 回に分けても 1 回でまとめても落下量は同じ")
