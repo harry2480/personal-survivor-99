@@ -185,6 +185,43 @@ func test_battle_with_no_players_finishes_without_winner() -> void:
 	assert_signal_emitted_with_parameters(manager, "battle_finished", [-1])
 
 
+func test_simultaneous_top_out_keeps_the_winner_alive() -> void:
+	# 同じ update 内で 2 人が Top Out しても、先に決まった勝者を脱落させない。
+	manager.setup(1, 1, SEED)
+	for player in manager.get_alive_players():
+		_top_out(player.session)
+	watch_signals(manager)
+
+	manager.update(0.0)
+
+	var winner: BattlePlayerState = manager.get_player(1)
+	assert_true(manager.is_finished(), "Battle は終了する")
+	assert_true(winner.alive, "勝者は生存したまま")
+	assert_eq(winner.rank, 1, "勝者は Rank 1 のまま")
+	assert_eq(manager.get_alive_count(), 1, "生存者は 1 人")
+	assert_signal_emit_count(manager, "player_eliminated", 1, "脱落通知は 1 回だけ")
+	assert_signal_emitted_with_parameters(manager, "battle_finished", [1])
+
+
+func test_elimination_after_finishing_is_ignored() -> void:
+	manager.setup(1, 1, SEED)
+	manager.eliminate_player(0)
+
+	manager.eliminate_player(1)
+
+	assert_true(manager.get_player(1).alive, "終了後の脱落は無視される")
+	assert_eq(manager.get_player(1).rank, 1, "勝者の Rank は変わらない")
+
+
+func _top_out(session: PuzzleSession) -> void:
+	# Gravity 0 なので Hard Drop を積み続ければ必ず Top Out する。
+	for i in 100:
+		if session.is_over():
+			return
+		session.hard_drop()
+	assert_true(session.is_over(), "前提: Top Out している")
+
+
 # --- Battle Phase（要件定義 §93） -------------------------------------------
 
 

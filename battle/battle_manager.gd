@@ -126,6 +126,9 @@ func update(delta_sec: float) -> void:
 		return
 
 	for player in _players:
+		# 同じ update 内の同時 Top Out で Battle が終わったら、勝者を脱落させない。
+		if _finished:
+			break
 		if not player.alive or player.session == null:
 			continue
 
@@ -140,8 +143,10 @@ func update(delta_sec: float) -> void:
 ## Player を脱落させる（要件定義 §54）。
 ##
 ## 脱落時の生存人数がそのまま順位になる（要件定義 §55）。
-## 既に脱落している Player と Invalid ID は無視する。
+## 既に脱落している Player と Invalid ID、Battle 終了後の呼び出しは無視する。
 func eliminate_player(player_id: int) -> void:
+	if _finished:
+		return
 	var player: BattlePlayerState = get_player(player_id)
 	if player == null or not player.alive:
 		return
