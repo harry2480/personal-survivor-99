@@ -59,3 +59,37 @@ func test_topped_out_screen_cannot_be_resumed_by_pause() -> void:
 	scene._on_command_pressed(GameCommand.Command.PAUSE)
 
 	assert_eq(scene._state, scene.ScreenState.TOPPED_OUT, "TOP OUT のまま維持される")
+
+
+func test_garbage_cells_are_drawn_with_a_dedicated_color() -> void:
+	# Garbage は Piece の種類（0〜6）より大きい値で盤面へ入るため、PIECE_COLORS を
+	# そのまま引くと範囲外参照になる。表示領域に Garbage が来ても引けることを確かめる。
+	var scene: Node = SOLO_PLAY.instantiate()
+	add_child_autofree(scene)
+	await wait_frames(2)
+
+	assert_gte(
+		GarbageQueue.GARBAGE_CELL, scene.PIECE_COLORS.size(), "前提: Garbage は PIECE_COLORS の範囲外"
+	)
+
+	var session: PuzzleSession = scene._session
+	session.receive_garbage_lines(2)
+	# Delay が経過するまで進めてから Lock すると、Garbage が盤面へ入る。
+	for _frame in range(120):
+		session.update(1.0 / 60.0)
+	session.hard_drop()
+
+	var board: Board = session.get_board()
+	var has_garbage: bool = false
+	for row in range(Board.VISIBLE_HEIGHT):
+		for x in range(Board.WIDTH):
+			var value: int = board.get_cell(x, Board.VISIBLE_TOP_Y + row)
+			if value == GarbageQueue.GARBAGE_CELL:
+				has_garbage = true
+			# 範囲外参照があれば、ここで実行時エラーになる。
+			scene._cell_color(value)
+
+	assert_true(has_garbage, "Garbage が表示領域に入る")
+	assert_eq(scene._cell_color(GarbageQueue.GARBAGE_CELL), scene.GARBAGE_COLOR, "Garbage は専用色")
+	assert_eq(scene._cell_color(Board.EMPTY), scene.EMPTY_COLOR, "空セルは変わらず空の色")
+	assert_eq(scene._cell_color(Piece.Type.T), scene.PIECE_COLORS[Piece.Type.T], "Piece の色は変わらない")
