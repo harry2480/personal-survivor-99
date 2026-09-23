@@ -40,6 +40,12 @@ extends Resource
 ## true なら置き換える（Perfect Clear の値だけを使う）。
 @export var perfect_clear_replaces_attack: bool = true
 
+## Attack が Garbage として相手の盤面へ届くまでの遅延（秒。要件定義 §41）。
+@export_range(0.0, 10.0, 0.05, "or_greater") var garbage_delay_sec: float = 1.0
+
+## Garbage Line の Hole の開け方（[enum GarbageHoleGenerator.Mode]）。
+@export var garbage_hole_mode: int = GarbageHoleGenerator.Mode.SAME_COLUMN_PER_EVENT
+
 ## Combo 段数ごとの Attack 加算値。
 ##
 ## index は「連続 Line Clear 数 - 1」。1 回目の Clear は Combo 0 として index 0 を見る。

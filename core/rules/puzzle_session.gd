@@ -28,8 +28,12 @@ signal t_spin_detected(result: int)
 ## Perfect Clear が成立した。
 signal perfect_clear_achieved
 
-## Attack が発生した。送り先の決定は Battle Layer の責務（Phase 4）。
+## Attack が発生した。Incoming の相殺後に残った余剰の行数（要件定義 §42）。
+## 送り先の決定は Battle Layer の責務（Phase 4）。
 signal attack_generated(amount: int, context: AttackContext)
+
+## Incoming Garbage が盤面へ適用された。
+signal garbage_applied(line_count: int)
 
 ## Top Out した（Spawn できなかった）。
 signal topped_out
@@ -46,13 +50,15 @@ var _auto_shift: AutoShift
 var _lock_delay: LockDelay
 var _scoring: ScoringState
 var _attack_calculator: AttackCalculator
+var _garbage_queue: GarbageQueue
+var _hole_generator: GarbageHoleGenerator
 var _t_spin_detector: TSpinDetector
 var _last_action_was_rotation: bool = false
 var _last_kick_index: int = -1
 var _last_kick_table_size: int = 0
 var _is_over: bool = false
-var _cleared_lines_total: int = 0
-var _last_attack: int = 0
+var _game_time_sec: float = 0.0
+var _next_attack_id: int = 0
 
 
 func _init(
@@ -70,6 +76,8 @@ func _init(
 	_lock_delay = LockDelay.new(_rules)
 	_scoring = ScoringState.new(_balance)
 	_attack_calculator = AttackCalculator.new(_balance)
+	_garbage_queue = GarbageQueue.new()
+	_hole_generator = GarbageHoleGenerator.new(_balance.garbage_hole_mode)
 	_t_spin_detector = TSpinDetector.new()
 
 
@@ -81,9 +89,10 @@ func start(game_seed: int = 0) -> void:
 	_auto_shift.release_all()
 	_drop.set_soft_dropping(false)
 	_scoring.reset()
+	_garbage_queue.clear()
+	_hole_generator.reset(game_seed)
+	_game_time_sec = 0.0
 	_is_over = false
-	_cleared_lines_total = 0
-	_last_attack = 0
 	_spawn_next()
 
 
@@ -92,6 +101,7 @@ func update(delta_sec: float) -> void:
 	if _is_over or not _piece.is_active():
 		return
 
+	_game_time_sec += maxf(0.0, delta_sec)
 	_apply_auto_shift(delta_sec)
 	# 着地までに使った時間は Lock Delay に含めない。含めると、同じ実時間でも
 	# delta の刻み方で Lock のタイミングが変わる（要件定義 §29 / §30）。
@@ -190,12 +200,9 @@ func get_next_types(count: int = NextQueue.MINIMUM_VISIBLE) -> Array[int]:
 	return _next_queue.peek(count)
 
 
-func get_held_type() -> int:
-	return _hold.get_held_type()
-
-
-func can_hold() -> bool:
-	return _hold.can_hold()
+## Hold 枠を返す。中身と使用可否はここから見る。
+func get_hold_slot() -> HoldSlot:
+	return _hold
 
 
 ## Ghost Piece の着地位置を返す。
@@ -210,14 +217,35 @@ func is_over() -> bool:
 	return _is_over
 
 
-## これまでに消した行数の合計を返す。
-func get_cleared_lines_total() -> int:
-	return _cleared_lines_total
+## Incoming Garbage を受け取る。送り元の決定は Battle Layer の責務（Phase 4）。
+func receive_garbage(event: GarbageEvent) -> void:
+	_garbage_queue.enqueue(event)
 
 
-## 直前の Lock で発生した Attack を返す。
-func get_last_attack() -> int:
-	return _last_attack
+## Incoming Garbage を行数だけ受け取る簡易版。テストと単体プレイで使う。
+func receive_garbage_lines(line_count: int, source_player_id: int = -1) -> void:
+	_next_attack_id += 1
+	receive_garbage(
+		GarbageEvent.create(
+			source_player_id,
+			-1,
+			line_count,
+			_game_time_sec,
+			_balance.garbage_delay_sec,
+			LineClear.Type.NONE,
+			_next_attack_id
+		)
+	)
+
+
+## Incoming Garbage の Queue を返す。
+func get_garbage_queue() -> GarbageQueue:
+	return _garbage_queue
+
+
+## ゲーム内の経過時間（秒）を返す。
+func get_game_time_sec() -> float:
+	return _game_time_sec
 
 
 ## Combo / Back-to-Back / 直前の T-Spin をまとめた状態を返す。
@@ -325,8 +353,8 @@ func _apply_lock_delay(delta_sec: float) -> void:
 
 func _lock_piece() -> void:
 	var locked_type: int = _piece.type
-	# 「直前の Lock で発生した Attack」なので、Attack が出ない Lock では 0 に戻す。
-	_last_attack = 0
+	# 「直前の Lock で送信した Attack」なので、Attack が出ない Lock では 0 に戻す。
+	_scoring.set_last_attack(0)
 	var t_spin: TSpinDetector.Result = _detect_t_spin()
 	if t_spin != TSpinDetector.Result.NONE:
 		t_spin_detected.emit(t_spin)
@@ -340,7 +368,6 @@ func _lock_piece() -> void:
 	_scoring.on_piece_locked(result, t_spin)
 
 	if result.has_cleared():
-		_cleared_lines_total += result.line_count
 		lines_cleared.emit(result)
 
 		var is_perfect_clear: bool = PerfectClear.is_achieved(_board, result.line_count)
@@ -349,9 +376,17 @@ func _lock_piece() -> void:
 
 		var context: AttackContext = AttackContext.create(result, _scoring, is_perfect_clear)
 		var attack: int = _attack_calculator.calculate(context)
-		_last_attack = attack
-		if attack > 0:
-			attack_generated.emit(attack, context)
+
+		# 要件定義 §42 の順序: 生成 Attack → Incoming を相殺 → 余剰を Target へ送信。
+		var surplus: int = _garbage_queue.cancel_with_attack(attack)
+		_scoring.set_last_attack(surplus)
+		if surplus > 0:
+			attack_generated.emit(surplus, context)
+
+	# 相殺で残った Incoming のうち、Delay が経過したものを盤面へ入れる。
+	var applied: int = _garbage_queue.apply_ready(_board, _game_time_sec, _hole_generator)
+	if applied > 0:
+		garbage_applied.emit(applied)
 
 	_hold.on_piece_locked()
 	_spawn_next()

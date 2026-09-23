@@ -29,6 +29,8 @@ const PIECE_COLORS: PackedColorArray = [
 	Color("9c27b0"),  # T
 	Color("f44336"),  # Z
 ]
+## Garbage の色。Piece の色と取り違えないよう、彩度のない灰にする。
+const GARBAGE_COLOR := Color("7a7f8c")
 const EMPTY_COLOR := Color("161821")
 const GRID_COLOR := Color("2a2d3a")
 const GHOST_ALPHA: float = 0.28
@@ -142,7 +144,7 @@ func _on_topped_out() -> void:
 
 
 func _update_status(message: String) -> void:
-	var lines: int = _session.get_cleared_lines_total() if _session != null else 0
+	var lines: int = _session.get_scoring().get_cleared_lines_total() if _session != null else 0
 	_status_label.text = "Lines: %d    %s" % [lines, message]
 
 
@@ -159,8 +161,21 @@ func _draw_board() -> void:
 		for x in range(Board.WIDTH):
 			var value: int = board.get_cell(x, Board.VISIBLE_TOP_Y + row)
 			var rect: Rect2 = _cell_rect(x, row, BOARD_ORIGIN)
-			draw_rect(rect, EMPTY_COLOR if value == Board.EMPTY else PIECE_COLORS[value])
+			draw_rect(rect, _cell_color(value))
 			draw_rect(rect, GRID_COLOR, false, 1.0)
+
+
+## セルの値に対応する色を返す。
+##
+## 盤面には Piece の種類（0〜6）のほかに Garbage（[constant GarbageQueue.GARBAGE_CELL]）が
+## 入る。[constant PIECE_COLORS] の添字は 0〜6 までなので、Garbage をそのまま引くと
+## 範囲外参照になる。
+func _cell_color(value: int) -> Color:
+	if value == Board.EMPTY:
+		return EMPTY_COLOR
+	if value == GarbageQueue.GARBAGE_CELL:
+		return GARBAGE_COLOR
+	return PIECE_COLORS[value]
 
 
 func _draw_ghost() -> void:
@@ -199,11 +214,11 @@ func _draw_next() -> void:
 
 
 func _draw_hold() -> void:
-	var held: int = _session.get_held_type()
+	var held: int = _session.get_hold_slot().get_held_type()
 	if held == HoldSlot.EMPTY:
 		return
 	var color: Color = PIECE_COLORS[held]
-	if not _session.can_hold():
+	if not _session.get_hold_slot().can_hold():
 		color = color.darkened(0.5)
 	_draw_piece_preview(held, HOLD_ORIGIN, color)
 

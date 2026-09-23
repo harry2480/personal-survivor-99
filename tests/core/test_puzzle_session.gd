@@ -28,7 +28,7 @@ func _fill_row_except(y: int, open_x: int) -> void:
 func test_starts_with_an_active_piece() -> void:
 	assert_true(session.get_active_piece().is_active(), "Piece が出ている")
 	assert_false(session.is_over(), "まだ終わっていない")
-	assert_eq(session.get_cleared_lines_total(), 0, "消した行は 0")
+	assert_eq(session.get_scoring().get_cleared_lines_total(), 0, "消した行は 0")
 
 
 func test_next_queue_is_visible() -> void:
@@ -119,9 +119,9 @@ func test_hold_swaps_the_piece() -> void:
 
 	assert_true(session.hold(), "Hold できる")
 
-	assert_eq(session.get_held_type(), first, "預けられる")
+	assert_eq(session.get_hold_slot().get_held_type(), first, "預けられる")
 	assert_eq(session.get_active_piece().type, expected_next, "NEXT から出てくる")
-	assert_false(session.can_hold(), "同じ Piece 中は再使用できない")
+	assert_false(session.get_hold_slot().can_hold(), "同じ Piece 中は再使用できない")
 
 
 func test_hold_returns_the_stored_piece_at_spawn_state() -> void:
@@ -136,7 +136,7 @@ func test_hold_returns_the_stored_piece_at_spawn_state() -> void:
 	assert_eq(session.get_active_piece().type, first, "預けた Piece が戻る")
 	assert_eq(session.get_active_piece().rotation, Piece.SPAWN_ROTATION as int, "初期回転で戻る")
 	assert_eq(session.get_active_piece().position, Piece.get_spawn_position(first), "Spawn 位置で戻る")
-	assert_eq(session.get_held_type(), second, "入れ替わる")
+	assert_eq(session.get_hold_slot().get_held_type(), second, "入れ替わる")
 
 
 func test_ghost_position_is_below_the_piece() -> void:
@@ -163,7 +163,7 @@ func test_line_clear_is_reported_and_counted() -> void:
 	session.hard_drop()
 
 	assert_signal_emitted(session, "lines_cleared", "Line Clear が通知される")
-	assert_eq(session.get_cleared_lines_total(), 1, "消した行が数えられる")
+	assert_eq(session.get_scoring().get_cleared_lines_total(), 1, "消した行が数えられる")
 	assert_false(session.get_board().is_row_filled(Board.TOTAL_HEIGHT - 1), "埋まっていた行が消えた")
 	# I の残り 3 マスが 1 段ずつ下がってくるので、最下段は空にはならない。
 	assert_eq(session.get_board().get_cell(0, Board.TOTAL_HEIGHT - 1), Piece.Type.I as int, "上が詰まる")

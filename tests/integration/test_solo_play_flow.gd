@@ -49,7 +49,7 @@ func test_playing_clears_a_line() -> void:
 	_tap_move(session, AutoShift.Direction.LEFT, Board.WIDTH)
 	session.hard_drop()
 
-	assert_eq(session.get_cleared_lines_total(), 1, "左端が埋まって 1 行消える")
+	assert_eq(session.get_scoring().get_cleared_lines_total(), 1, "左端が埋まって 1 行消える")
 	assert_false(board.is_row_filled(Board.TOTAL_HEIGHT - 1), "揃った行は残らない")
 	assert_false(session.is_over(), "Top Out していない")
 
@@ -210,7 +210,7 @@ func test_perfect_clear_is_reported_when_the_board_empties() -> void:
 
 
 func test_last_attack_is_cleared_by_a_lock_without_attack() -> void:
-	# get_last_attack() は「直前の Lock で発生した Attack」。Attack が出ない Lock の
+	# get_last_attack() は「直前の Lock で送信した Attack」。Attack が出ない Lock の
 	# 後に前回の値が残ると、UI や Battle Layer が誤った量を読む。
 	var i_seed: int = _find_seed_starting_with_i()
 	var rules := GameRules.create_default()
@@ -233,9 +233,61 @@ func test_last_attack_is_cleared_by_a_lock_without_attack() -> void:
 			board.set_cell(x, bottom, Piece.Type.I)
 
 	session.hard_drop()
-	assert_gt(session.get_last_attack(), 0, "前提: Perfect Clear で Attack が出る")
+	assert_gt(session.get_scoring().get_last_attack(), 0, "前提: Perfect Clear で Attack が出る")
 
 	# 次の Piece を落とす。盤面は空なので行は揃わず、Attack は発生しない。
 	session.hard_drop()
 
-	assert_eq(session.get_last_attack(), 0, "Attack が出ない Lock では 0 に戻る")
+	assert_eq(session.get_scoring().get_last_attack(), 0, "Attack が出ない Lock では 0 に戻る")
+
+
+func test_cancellation_order_in_a_real_session() -> void:
+	# 要件定義 §42 の順序（生成 Attack → Incoming 相殺 → 余剰を送信）を実際の進行で確かめる。
+	var i_seed: int = _find_seed_starting_with_i()
+	var rules := GameRules.create_default()
+	rules.gravity_cells_per_second = 0.0
+	var balance := GameBalance.create_default()
+	balance.line_attack_table = PackedInt32Array([0, 5, 5, 5, 5])  # Single でも 5 送る
+	balance.garbage_delay_sec = 100.0  # 相殺の検証中に盤面へ入らないようにする
+	var session := PuzzleSession.new(rules, PieceRandomizer.new(i_seed), balance)
+	session.start(i_seed)
+
+	session.receive_garbage_lines(3)
+	assert_eq(session.get_garbage_queue().get_pending_lines(), 3, "前提: Incoming が 3 行")
+
+	var board: Board = session.get_board()
+	for x in range(1, Board.WIDTH):
+		board.set_cell(x, Board.TOTAL_HEIGHT - 1, Piece.Type.I)
+
+	watch_signals(session)
+	session.rotate(RotationSystem.Direction.CLOCKWISE)
+	_tap_move(session, AutoShift.Direction.LEFT, Board.WIDTH)
+	session.hard_drop()
+
+	assert_eq(session.get_garbage_queue().get_pending_lines(), 0, "Incoming が相殺で消える")
+	assert_eq(session.get_scoring().get_last_attack(), 2, "余剰 5 - 3 = 2 だけが送信される")
+	assert_signal_emitted(session, "attack_generated", "余剰があれば通知される")
+
+
+func test_garbage_is_applied_after_the_delay() -> void:
+	var rules := GameRules.create_default()
+	rules.gravity_cells_per_second = 0.0
+	var balance := GameBalance.create_default()
+	balance.garbage_delay_sec = 0.5
+	var session := PuzzleSession.new(rules, PieceRandomizer.new(SEED), balance)
+	session.start(SEED)
+
+	session.receive_garbage_lines(2)
+
+	# Delay 経過前に Lock しても盤面へは入らない。
+	session.hard_drop()
+	assert_eq(session.get_garbage_queue().get_pending_lines(), 2, "Delay 前は Queue に残る")
+
+	# 時間を進めてから Lock すると入る。
+	for _frame in range(60):
+		session.update(1.0 / 60.0)
+	watch_signals(session)
+	session.hard_drop()
+
+	assert_eq(session.get_garbage_queue().get_pending_lines(), 0, "Delay 経過で適用される")
+	assert_signal_emitted(session, "garbage_applied", "適用が通知される")
