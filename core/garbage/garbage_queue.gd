@@ -142,8 +142,11 @@ func _sort_events() -> void:
 
 
 # 同時刻でも順序が一意に決まるよう、活性時刻 → attack_id → 受け取り順で比較する。
+#
+# 活性時刻は厳密に比べる。is_equal_approx() は推移律を満たさないため、
+# 近い時刻が混ざると比較の結果が並べ替えの順番に依存し、決定論が崩れる（§110 / §111）。
 static func _compare_events(left: GarbageEvent, right: GarbageEvent) -> bool:
-	if not is_equal_approx(left.activation_time, right.activation_time):
+	if left.activation_time != right.activation_time:
 		return left.activation_time < right.activation_time
 	if left.attack_id != right.attack_id:
 		return left.attack_id < right.attack_id

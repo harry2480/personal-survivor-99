@@ -19,6 +19,12 @@ signal device_connected(device_id: int, device_name: String)
 ## Controller が切断された。切断後の扱いは #33 で詰める。
 signal device_disconnected(device_id: int, device_name: String)
 
+## Stick 入力のしきい値（Dead Zone）の既定値（要件定義 §14 / §97 Input）。
+##
+## Dead Zone は Controller の設定なので Game Core では持たない（要件定義 §17）。
+## ユーザー設定での上書きは [method apply_user_settings] から行う。
+const DEFAULT_DEAD_ZONE: float = 0.5
+
 var _pressed: Dictionary = {}
 var _device_names: Dictionary = {}
 
@@ -67,14 +73,32 @@ func release_all() -> void:
 
 ## Stick 入力のしきい値（Dead Zone）を全 Action へ適用する（要件定義 §14）。
 ##
-## 値は [GameRules] から来る。Controller の個体差を吸収するため、実行時に
-## 変更できるようにしている。
+## Controller の個体差を吸収するため、実行時に変更できるようにしている。
 static func apply_dead_zone(dead_zone: float) -> void:
 	var value: float = clampf(dead_zone, 0.0, 0.99)
 	for command in GameCommand.get_all_commands():
 		var action_name: String = GameCommand.get_action_name(command)
 		if InputMap.has_action(action_name):
 			InputMap.action_set_deadzone(action_name, value)
+
+
+## ユーザー設定のうち Input に属するものを反映する（要件定義 §97 Input）。
+##
+## 知らないキーは無視し、不正な値は採用しない。反映できたキーの数を返す。
+static func apply_user_settings(settings: Dictionary) -> int:
+	var applied: int = 0
+
+	if _is_dead_zone(settings.get("stick_dead_zone")):
+		apply_dead_zone(float(settings["stick_dead_zone"]))
+		applied += 1
+
+	return applied
+
+
+static func _is_dead_zone(value: Variant) -> bool:
+	if typeof(value) != TYPE_FLOAT and typeof(value) != TYPE_INT:
+		return false
+	return float(value) >= 0.0 and float(value) < 1.0
 
 
 ## 接続されている Controller の ID を返す。

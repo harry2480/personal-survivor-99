@@ -1,12 +1,13 @@
 {
-  "_comment": "ユーザー設定の既定値（要件定義 §39 Game Balance Data / §97 Settings）。gameplay の値は GameRules.apply_user_settings() で上書きに使う。",
+  "_comment": "ユーザー設定の既定値（要件定義 §39 Game Balance Data / §97 Settings）。gameplay の値は GameRules.apply_user_settings()、input の値は InputManager.apply_user_settings() で上書きに使う。",
   "gameplay": {
     "das_sec": 0.167,
     "arr_sec": 0.033,
-    "soft_drop_multiplier": 20.0,
-    "stick_dead_zone": 0.5
+    "soft_drop_multiplier": 20.0
   },
   "audio": {},
   "video": {},
-  "input": {}
+  "input": {
+    "stick_dead_zone": 0.5
+  }
 }

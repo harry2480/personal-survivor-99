@@ -107,6 +107,23 @@ func test_same_time_and_id_order_is_decided_by_arrival() -> void:
 	assert_eq(order[1].line_count, 2, "後から受け取ったものが後")
 
 
+func test_close_but_different_times_keep_their_order() -> void:
+	# is_equal_approx() で比べると、わずかに違う活性時刻が「同時刻」に化けて
+	# attack_id の小さい方が先に出る。相殺の対象が入れ替わるため厳密に比べる。
+	queue.enqueue(_event(1, 10.0, 30))
+	queue.enqueue(_event(2, 10.00005, 10))
+
+	var order: Array[GarbageEvent] = queue.peek_all()
+
+	assert_eq(order[0].attack_id, 30, "活性時刻が早い方が先（attack_id では抜かせない）")
+	assert_eq(order[1].attack_id, 10, "遅い方が後")
+
+	# 相殺も早い Event から消える（要件定義 §42）。
+	assert_eq(queue.cancel_with_attack(1), 0, "1 行ぶんは相殺に使われる")
+	assert_eq(order[0].line_count, 0, "早い Event から相殺される")
+	assert_eq(order[1].line_count, 2, "遅い Event は残る")
+
+
 # --- Cancellation（要件定義 §42） -------------------------------------------
 
 

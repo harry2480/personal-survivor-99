@@ -104,10 +104,20 @@ func test_dead_zone_is_clamped() -> void:
 	InputManager.apply_dead_zone(original)
 
 
-func test_dead_zone_comes_from_the_rules() -> void:
+func test_dead_zone_is_an_input_setting_not_a_game_rule() -> void:
+	# Dead Zone は Controller の設定なので、Game Core（要件定義 §17）ではなく
+	# Input が持つ。§97 でも Gameplay ではなく Input に分類されている。
 	var rules := GameRules.create_default()
 
-	assert_true(rules.stick_dead_zone > 0.0, "既定値が入っている")
-	assert_eq(rules.apply_user_settings({"stick_dead_zone": 0.3}), 1, "ユーザー設定で変えられる")
-	assert_eq(rules.stick_dead_zone, 0.3, "反映される")
-	assert_eq(rules.apply_user_settings({"stick_dead_zone": 1.5}), 0, "1.0 以上は採用しない")
+	assert_false("stick_dead_zone" in rules, "GameRules は Dead Zone を持たない")
+	assert_eq(rules.apply_user_settings({"stick_dead_zone": 0.3}), 0, "GameRules は受け取らない")
+
+	var original: float = InputMap.action_get_deadzone("move_left")
+
+	assert_gt(InputManager.DEFAULT_DEAD_ZONE, 0.0, "Input 側に既定値がある")
+	assert_eq(InputManager.apply_user_settings({"stick_dead_zone": 0.3}), 1, "Input が反映する")
+	assert_almost_eq(InputMap.action_get_deadzone("move_left"), 0.3, 0.001, "InputMap へ届く")
+	assert_eq(InputManager.apply_user_settings({"stick_dead_zone": 1.5}), 0, "1.0 以上は採用しない")
+	assert_almost_eq(InputMap.action_get_deadzone("move_left"), 0.3, 0.001, "不正な値では変わらない")
+
+	InputManager.apply_dead_zone(original)

@@ -53,7 +53,7 @@ func _ready() -> void:
 	add_child(_status_label)
 
 	var rules: GameRules = _load_rules()
-	InputManager.apply_dead_zone(rules.stick_dead_zone)
+	InputManager.apply_dead_zone(InputManager.DEFAULT_DEAD_ZONE)
 
 	_session = PuzzleSession.new(rules)
 	_session.lines_cleared.connect(_on_lines_cleared)
