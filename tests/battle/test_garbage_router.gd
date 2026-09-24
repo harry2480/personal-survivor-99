@@ -144,6 +144,39 @@ func test_garbage_is_applied_after_the_delay() -> void:
 	assert_eq(_incoming(1), 0, "Delay 経過で適用される")
 
 
+func test_delay_follows_the_target_session_clock() -> void:
+	# Session を Manager と別に進めても、Delay は受け手の時計で数える。
+	_player(1).session.update(10.0)
+	_player(0).current_target = 1
+	router.route(0, 2, LineClear.Type.DOUBLE)
+
+	_player(1).session.hard_drop()
+
+	assert_eq(_incoming(1), 2, "受け手の時計で Delay 前なので Queue に残る")
+
+
+func test_reset_reconnects_after_setup_is_redone() -> void:
+	var old_session: PuzzleSession = _player(0).session
+	manager.setup(1, 2, SEED)
+	router.reset()
+
+	_player(0).current_target = 1
+	router.route(0, 2, LineClear.Type.DOUBLE)
+	for _frame in range(90):
+		manager.update(1.0 / 60.0)
+	_player(1).session.hard_drop()
+
+	assert_eq(router.get_attribution().get_history(1).size(), 1, "新しい Session の適用が記録される")
+	assert_true(old_session.attack_generated.get_connections().is_empty(), "古い Session との接続は解除される")
+
+
+func test_reset_does_not_connect_twice() -> void:
+	router.reset()
+	router.reset()
+
+	assert_eq(_player(0).session.attack_generated.get_connections().size(), 1, "接続は 1 本だけ")
+
+
 # --- KO Attribution（要件定義 §56） -----------------------------------------
 
 

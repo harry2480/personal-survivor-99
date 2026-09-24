@@ -124,7 +124,8 @@ func get_battle_seed() -> int:
 
 ## Battle 開始からの経過時間（秒）を返す。
 ##
-## Garbage の活性時刻と KO の帰属判定が、この時刻を基準にする。
+## KO の帰属判定（適用時刻と判定時刻）がこの時刻を基準にする。
+## Garbage の活性時刻は受け手の Session の時計で決める（[GarbageRouter]）。
 func get_elapsed_sec() -> float:
 	return _elapsed_sec
 

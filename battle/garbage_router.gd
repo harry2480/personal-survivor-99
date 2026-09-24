@@ -23,6 +23,8 @@ var _manager: BattleManager
 var _balance: GameBalance
 var _attribution: KoAttribution = KoAttribution.new()
 var _next_attack_id: int = 0
+# 接続した Session と Callable の組。解除するときに同じ Callable が要る（bind すると別物になる）。
+var _connections: Array = []
 
 
 func _init(manager: BattleManager, balance: GameBalance = null) -> void:
@@ -36,10 +38,15 @@ func get_attribution() -> KoAttribution:
 	return _attribution
 
 
-## 帰属の記録と Attack ID を初期状態へ戻す。
+## 帰属の記録と Attack ID を初期状態へ戻し、現在の Player へ接続し直す。
+##
+## [method BattleManager.setup] をやり直すと Session が作り直されるので、
+## その後に呼ぶ。古い Session との接続はここで解除する。
 func reset() -> void:
+	_disconnect_players()
 	_attribution.clear()
 	_next_attack_id = 0
+	_connect_players()
 
 
 ## 送信元から Target へ Garbage を送る。
@@ -57,12 +64,14 @@ func route(source_player_id: int, line_count: int, attack_type: LineClear.Type) 
 	if target == null or not target.is_targetable() or target.player_id == source.player_id:
 		return false
 
+	# 活性時刻は受け手の Session の時計で決める。適用の判定（GarbageQueue.apply_ready）が
+	# その時計で行われるため。Manager の時計とは、Session を個別に進めるとずれる。
 	_next_attack_id += 1
 	var event: GarbageEvent = GarbageEvent.create(
 		source.player_id,
 		target.player_id,
 		line_count,
-		_manager.get_elapsed_sec(),
+		target.session.get_game_time_sec(),
 		_balance.garbage_delay_sec,
 		attack_type,
 		_next_attack_id
@@ -77,10 +86,21 @@ func _connect_players() -> void:
 	for player in _manager.get_players():
 		if player.session == null:
 			continue
-		player.session.attack_generated.connect(_on_attack_generated.bind(player.player_id))
-		player.session.garbage_event_applied.connect(
-			_on_garbage_event_applied.bind(player.player_id)
-		)
+		var on_attack: Callable = _on_attack_generated.bind(player.player_id)
+		var on_applied: Callable = _on_garbage_event_applied.bind(player.player_id)
+		player.session.attack_generated.connect(on_attack)
+		player.session.garbage_event_applied.connect(on_applied)
+		_connections.append([player.session, on_attack, on_applied])
+
+
+func _disconnect_players() -> void:
+	for entry in _connections:
+		var session: PuzzleSession = entry[0]
+		if session.attack_generated.is_connected(entry[1]):
+			session.attack_generated.disconnect(entry[1])
+		if session.garbage_event_applied.is_connected(entry[2]):
+			session.garbage_event_applied.disconnect(entry[2])
+	_connections.clear()
 
 
 func _on_attack_generated(amount: int, context: AttackContext, source_player_id: int) -> void:
