@@ -81,7 +81,7 @@ func _measure_columns(board: Board) -> void:
 		var top_y: int = Board.TOTAL_HEIGHT
 		var column_holes: int = 0
 		var column_hole_depth: int = 0
-		var previous_filled: bool = true  # 盤面の下端の外は埋まり扱い
+		var previous_filled: bool = false  # 走査開始位置より上は空
 
 		for y in range(Board.TOTAL_HEIGHT):
 			var filled: bool = not board.is_cell_empty(x, y)
@@ -123,15 +123,18 @@ func _measure_rows(board: Board) -> void:
 	for y in range(Board.TOTAL_HEIGHT):
 		var filled_cells: int = 0
 		var previous_filled: bool = true  # 左右の壁は埋まり扱い
-		var garbage_hole_x: int = -1
+		var has_garbage: bool = false
+		var has_covered_gap: bool = false
 
 		for x in range(Board.WIDTH):
 			var value: int = board.get_cell(x, y)
 			var filled: bool = value != Board.EMPTY
 			if filled:
 				filled_cells += 1
-			elif value == Board.EMPTY:
-				garbage_hole_x = x
+				has_garbage = has_garbage or value == GarbageQueue.GARBAGE_CELL
+			elif y > Board.TOTAL_HEIGHT - _heights[x]:
+				# 同じ列のもっと上にブロックがある。真上が空いていても蓋になる。
+				has_covered_gap = true
 			if filled != previous_filled:
 				row_transitions += 1
 			previous_filled = filled
@@ -141,13 +144,5 @@ func _measure_rows(board: Board) -> void:
 
 		if filled_cells == Board.WIDTH:
 			completed_lines += 1
-		elif _is_garbage_row(board, y) and garbage_hole_x >= 0:
-			if not board.is_cell_empty(garbage_hole_x, y - 1):
-				blocked_garbage_rows += 1
-
-
-static func _is_garbage_row(board: Board, y: int) -> bool:
-	for x in range(Board.WIDTH):
-		if board.get_cell(x, y) == GarbageQueue.GARBAGE_CELL:
-			return true
-	return false
+		elif has_garbage and has_covered_gap:
+			blocked_garbage_rows += 1

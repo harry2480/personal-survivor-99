@@ -91,6 +91,26 @@ func test_measuring_twice_does_not_accumulate() -> void:
 	assert_eq(metrics.holes, first_holes, "使い回しても値が積み上がらない")
 
 
+func test_garbage_rows_under_a_lid_are_blocked() -> void:
+	GarbageQueue.push_lines(board, PackedInt32Array([3, 3]))
+	# 2 行とも同じ列に穴があり、その上に蓋をする。下の行の真上は空きのまま。
+	board.set_cell(3, Board.TOTAL_HEIGHT - 3, Piece.Type.T)
+	var metrics := BoardMetrics.new()
+
+	metrics.measure(board)
+
+	assert_eq(metrics.blocked_garbage_rows, 2, "真上が空いていても、列の上に蓋があれば塞がれている")
+
+
+func test_open_garbage_rows_are_not_blocked() -> void:
+	GarbageQueue.push_lines(board, PackedInt32Array([3, 3]))
+	var metrics := BoardMetrics.new()
+
+	metrics.measure(board)
+
+	assert_eq(metrics.blocked_garbage_rows, 0, "穴の列に蓋がなければ掘り返せる")
+
+
 # --- 評価値 ----------------------------------------------------------------
 
 
