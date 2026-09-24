@@ -123,6 +123,27 @@ func test_attribution_expires() -> void:
 	assert_eq(_player(2).ko_count, 0, "しきい値を過ぎたら帰属しない")
 
 
+func test_ko_is_credited_to_an_eliminated_attacker() -> void:
+	attribution.record_application(1, 2, 0.0, 4)
+	manager.eliminate_player(2)
+
+	manager.eliminate_player(1)
+
+	assert_eq(_player(2).ko_count, 1, "攻撃者が先に脱落していても KO は記録される")
+
+
+func test_player_ko_is_emitted_after_the_stats_are_updated() -> void:
+	attribution.record_application(1, 2, 0.0, 4)
+	var seen: Array = []
+	ko.player_ko.connect(
+		func(_victim: int, attacker: int) -> void: seen.append(_player(attacker).ko_count)
+	)
+
+	manager.eliminate_player(1)
+
+	assert_eq(seen, [1], "通知の時点で KO 数が更新済み")
+
+
 func test_ko_rule_can_be_replaced() -> void:
 	attribution.record_application(1, 2, 0.0, 4)
 	ko.set_rule(KoRule.new(0.0))
@@ -191,6 +212,41 @@ func test_multiplier_is_applied_to_the_attack() -> void:
 	assert_eq(MultiplierSystem.apply(5, _player(0)), 10, "倍率が乗る")
 	assert_eq(MultiplierSystem.apply(5, _player(0), 3), 13, "人数補正も乗る")
 	assert_eq(MultiplierSystem.apply(5, null), 5, "Player がいなければ等倍")
+
+
+func test_multiplier_reaches_the_session() -> void:
+	ko.get_multiplier_system().add_attack_points(_player(0), balance.multiplier_thresholds[1])
+
+	assert_eq(_player(0).session.attack_multiplier, _player(0).attack_multiplier, "Session に届く")
+	assert_gt(_player(0).session.attack_multiplier, 1.0, "倍率が上がっている")
+
+
+func test_multiplier_is_applied_before_cancellation() -> void:
+	# 5 行の Attack が 2 倍で 10 行になり、Incoming 3 行を相殺して 7 行が残る。
+	balance.line_attack_table = PackedInt32Array([0, 5, 5, 5, 5])
+	balance.garbage_delay_sec = 100.0
+	var session: PuzzleSession = _player(0).session
+	session.attack_multiplier = 2.0
+	session.receive_garbage_lines(3)
+	watch_signals(session)
+
+	_clear_one_line(_player(0))
+
+	assert_eq(session.get_garbage_queue().get_pending_lines(), 0, "Incoming は倍率込みの Attack で消える")
+	assert_signal_emitted(session, "attack_generated", "余剰が送られる")
+	assert_eq(get_signal_parameters(session, "attack_generated")[0], 7, "余剰は倍率込みで 7 行")
+
+
+func _clear_one_line(player: BattlePlayerState) -> void:
+	# 最下段を左端 1 列だけ空け、縦の I で埋めて 1 行消す。
+	var board: Board = player.get_board()
+	for x in range(1, Board.WIDTH):
+		board.set_cell(x, Board.TOTAL_HEIGHT - 1, Piece.Type.I)
+	var piece: ActivePiece = player.session.get_active_piece()
+	piece.spawn(Piece.Type.I)
+	piece.rotation = Piece.Rotation.RIGHT
+	piece.position = Vector2i(-2, 0)
+	player.session.hard_drop()
 
 
 func test_thresholds_are_data_driven() -> void:

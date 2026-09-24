@@ -78,14 +78,15 @@ func _on_player_eliminated(victim_player_id: int, rank: int) -> void:
 	var attacker_id: int = _rule.determine_attacker(
 		_attribution, victim_player_id, _manager.get_elapsed_sec()
 	)
-	player_ko.emit(victim_player_id, attacker_id)
-
+	# 攻撃者が先に脱落していても、帰属した KO は戦績に残す。
+	# 脱落者は Attack を送れないので、Attack Points が増えても影響しない。
 	var attacker: BattlePlayerState = _manager.get_player(attacker_id)
-	if attacker == null or not attacker.alive:
-		return
+	if attacker != null:
+		attacker.ko_count += 1
+		_multiplier.add_attack_points(attacker, _balance.ko_attack_points)
 
-	attacker.ko_count += 1
-	_multiplier.add_attack_points(attacker, _balance.ko_attack_points)
+	# 購読者が通知中に戦績を読んでも最新になるよう、更新の後に通知する。
+	player_ko.emit(victim_player_id, attacker_id)
 
 
 func _on_battle_finished(winner_player_id: int) -> void:

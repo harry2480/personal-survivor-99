@@ -32,6 +32,9 @@ func refresh(player: BattlePlayerState) -> void:
 
 	var stage: int = _balance.get_multiplier_stage(player.attack_points)
 	var multiplier: float = _balance.get_multiplier_value(stage)
+	# 実際の Attack は Game Core が相殺の前に倍率を掛ける。表示用の値と常に揃える。
+	if player.session != null:
+		player.session.attack_multiplier = multiplier
 	if is_equal_approx(multiplier, player.attack_multiplier):
 		return
 
