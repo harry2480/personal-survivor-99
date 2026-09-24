@@ -163,6 +163,48 @@ func test_application_is_recorded_with_its_source() -> void:
 	assert_signal_emitted(router, "garbage_received", "受信が通知される")
 
 
+func test_cancelled_garbage_is_not_credited_to_its_source() -> void:
+	# 0 の Garbage が相殺で消えた後、2 の Garbage が適用されたら 2 の記録になる。
+	_player(0).current_target = 1
+	_player(2).current_target = 1
+	router.route(0, 2, LineClear.Type.DOUBLE)
+	_player(1).session.get_garbage_queue().cancel_with_attack(2)
+	router.route(2, 1, LineClear.Type.SINGLE)
+
+	for _frame in range(90):
+		manager.update(1.0 / 60.0)
+	_player(1).session.hard_drop()
+
+	var history: Array = router.get_attribution().get_history(1)
+	assert_eq(history.size(), 1, "適用された Event だけが記録される")
+	assert_eq(history[0].source_player_id, 2, "相殺で消えた 0 ではなく 2 の記録になる")
+	assert_eq(history[0].line_count, 1, "行数も適用された分だけ")
+
+
+func test_partially_cancelled_garbage_records_the_remaining_lines() -> void:
+	_player(0).current_target = 1
+	router.route(0, 3, LineClear.Type.TRIPLE)
+	_player(1).session.get_garbage_queue().cancel_with_attack(2)
+
+	for _frame in range(90):
+		manager.update(1.0 / 60.0)
+	_player(1).session.hard_drop()
+
+	var history: Array = router.get_attribution().get_history(1)
+	assert_eq(history.size(), 1, "残った分が記録される")
+	assert_eq(history[0].line_count, 1, "相殺後に残った 1 行だけ")
+
+
+func test_garbage_without_source_is_not_recorded() -> void:
+	_player(1).session.receive_garbage_lines(2)
+
+	for _frame in range(90):
+		manager.update(1.0 / 60.0)
+	_player(1).session.hard_drop()
+
+	assert_eq(router.get_attribution().get_history(1).size(), 0, "送り元のない Garbage は記録しない")
+
+
 func test_last_effective_attacker_within_the_window() -> void:
 	var attribution := KoAttribution.new()
 	attribution.record_application(1, 0, 10.0, 2)

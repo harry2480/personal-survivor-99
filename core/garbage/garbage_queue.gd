@@ -14,6 +14,9 @@ extends RefCounted
 ## 生成 Attack → Incoming を相殺 → 余剰を Target へ送信
 ## [/codeblock]
 
+## Event が盤面へ適用された。相殺で消えた分は含まない。
+signal event_applied(source_player_id: int, line_count: int)
+
 ## Garbage Line を表す Board のセル値。Piece の種類（0 以上）と区別する。
 const GARBAGE_CELL: int = 7
 
@@ -126,6 +129,8 @@ func _apply_event(board: Board, event: GarbageEvent, holes: GarbageHoleGenerator
 	var hole_columns: PackedInt32Array = holes.generate(event.line_count)
 	var applied: int = push_lines(board, hole_columns)
 	event.line_count = 0
+	if applied > 0:
+		event_applied.emit(event.source_player_id, applied)
 	return applied
 
 

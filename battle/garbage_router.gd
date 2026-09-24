@@ -10,6 +10,8 @@ extends RefCounted
 ##
 ## Garbage が盤面へ適用されたら [KoAttribution] に記録し、KO の原因になった
 ## 攻撃者を後から特定できるようにする（要件定義 §56）。
+## 出所は [signal PuzzleSession.garbage_event_applied] から受け取る。Router 側で
+## 送信の控えを持つと、相殺で消えた Garbage を控えから消せず、出所がずれる。
 
 ## Attack が Garbage として送られた。
 signal garbage_routed(source_player_id: int, target_player_id: int, line_count: int)
@@ -21,8 +23,6 @@ var _manager: BattleManager
 var _balance: GameBalance
 var _attribution: KoAttribution = KoAttribution.new()
 var _next_attack_id: int = 0
-# 各 Player へ「いま届こうとしている Garbage」の出所。適用時の記録に使う。
-var _pending_sources: Dictionary = {}
 
 
 func _init(manager: BattleManager, balance: GameBalance = null) -> void:
@@ -36,10 +36,9 @@ func get_attribution() -> KoAttribution:
 	return _attribution
 
 
-## 記録と受け渡し待ちの状態を捨てる。
+## 帰属の記録と Attack ID を初期状態へ戻す。
 func reset() -> void:
 	_attribution.clear()
-	_pending_sources.clear()
 	_next_attack_id = 0
 
 
@@ -69,17 +68,9 @@ func route(source_player_id: int, line_count: int, attack_type: LineClear.Type) 
 		_next_attack_id
 	)
 
-	_remember_source(target.player_id, source.player_id, line_count)
 	target.session.receive_garbage(event)
 	garbage_routed.emit(source.player_id, target.player_id, line_count)
 	return true
-
-
-# 適用時に「誰から来たか」を復元するための控え。
-func _remember_source(victim_id: int, source_id: int, line_count: int) -> void:
-	var pending: Array = _pending_sources.get(victim_id, [])
-	pending.append([source_id, line_count])
-	_pending_sources[victim_id] = pending
 
 
 func _connect_players() -> void:
@@ -87,30 +78,22 @@ func _connect_players() -> void:
 		if player.session == null:
 			continue
 		player.session.attack_generated.connect(_on_attack_generated.bind(player.player_id))
-		player.session.garbage_applied.connect(_on_garbage_applied.bind(player.player_id))
+		player.session.garbage_event_applied.connect(
+			_on_garbage_event_applied.bind(player.player_id)
+		)
 
 
 func _on_attack_generated(amount: int, context: AttackContext, source_player_id: int) -> void:
 	route(source_player_id, amount, context.clear_type)
 
 
-func _on_garbage_applied(line_count: int, victim_player_id: int) -> void:
-	var applied_time: float = _manager.get_elapsed_sec()
-	var remaining: int = line_count
-	var pending: Array = _pending_sources.get(victim_player_id, [])
-
-	# 古い順に、適用された行数ぶんだけ出所を割り当てる。
-	while remaining > 0 and not pending.is_empty():
-		var entry: Array = pending[0]
-		var source_id: int = entry[0]
-		var lines: int = mini(entry[1], remaining)
-
-		_attribution.record_application(victim_player_id, source_id, applied_time, lines)
-		garbage_received.emit(victim_player_id, source_id, lines)
-
-		remaining -= lines
-		entry[1] -= lines
-		if entry[1] <= 0:
-			pending.pop_front()
-
-	_pending_sources[victim_player_id] = pending
+func _on_garbage_event_applied(
+	source_player_id: int, line_count: int, victim_player_id: int
+) -> void:
+	# 送り元のない Garbage（テスト・単体プレイ用）は攻撃者として記録しない。
+	if source_player_id < 0:
+		return
+	_attribution.record_application(
+		victim_player_id, source_player_id, _manager.get_elapsed_sec(), line_count
+	)
+	garbage_received.emit(victim_player_id, source_player_id, line_count)
