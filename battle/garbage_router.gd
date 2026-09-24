@@ -38,6 +38,18 @@ func get_attribution() -> KoAttribution:
 	return _attribution
 
 
+## 購読を解除して参照を切る。
+##
+## Router は各 Player の signal を購読し、Player 側は Callable として Router を
+## 参照する。RefCounted 同士のこの循環は自動では解放されないため、Battle を
+## 捨てるときに明示的に切る（Phase 7 の連戦と Phase 10 のリーク検証の前提）。
+## [method reset] と違い、接続し直さない。
+func dispose() -> void:
+	_disconnect_players()
+	_attribution.clear()
+	_next_attack_id = 0
+
+
 ## 帰属の記録と Attack ID を初期状態へ戻し、現在の Player へ接続し直す。
 ##
 ## [method BattleManager.setup] をやり直すと Session が作り直されるので、

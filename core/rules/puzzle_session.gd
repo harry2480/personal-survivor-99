@@ -42,6 +42,14 @@ signal garbage_event_applied(source_player_id: int, line_count: int)
 ## Top Out した（Spawn できなかった）。
 signal topped_out
 
+## Attack 倍率（要件定義 §38 の後半 / §57）。0 未満は 0 にする。
+##
+## 倍率は相殺の前に掛ける。倍率の決め方は Battle Layer の責務で、ここには
+## 決まった値だけが渡ってくる。
+var attack_multiplier: float = 1.0:
+	set(value):
+		attack_multiplier = maxf(0.0, value)
+
 var _rules: GameRules
 var _balance: GameBalance
 var _board: Board
@@ -383,9 +391,11 @@ func _lock_piece() -> void:
 			perfect_clear_achieved.emit()
 
 		var context: AttackContext = AttackContext.create(result, _scoring, is_perfect_clear)
-		var attack: int = _attack_calculator.calculate(context)
+		var attack: int = AttackCalculator.apply_multipliers(
+			_attack_calculator.calculate(context), attack_multiplier
+		)
 
-		# 要件定義 §42 の順序: 生成 Attack → Incoming を相殺 → 余剰を Target へ送信。
+		# 要件定義 §42 の順序: 生成 Attack（倍率込み）→ Incoming を相殺 → 余剰を Target へ送信。
 		var surplus: int = _garbage_queue.cancel_with_attack(attack)
 		_scoring.set_last_attack(surplus)
 		if surplus > 0:
