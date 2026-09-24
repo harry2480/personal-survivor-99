@@ -35,6 +35,10 @@ signal attack_generated(amount: int, context: AttackContext)
 ## Incoming Garbage が盤面へ適用された。
 signal garbage_applied(line_count: int)
 
+## Incoming Garbage が Event 単位で盤面へ適用された。KO の帰属判定に使う（要件定義 §56）。
+## 1 回の Lock で複数の Event が適用されると、Event ごとに 1 回ずつ通知する。
+signal garbage_event_applied(source_player_id: int, line_count: int)
+
 ## Top Out した（Spawn できなかった）。
 signal topped_out
 
@@ -77,6 +81,7 @@ func _init(
 	_scoring = ScoringState.new(_balance)
 	_attack_calculator = AttackCalculator.new(_balance)
 	_garbage_queue = GarbageQueue.new()
+	_garbage_queue.event_applied.connect(garbage_event_applied.emit)
 	_hole_generator = GarbageHoleGenerator.new(_balance.garbage_hole_mode)
 	_t_spin_detector = TSpinDetector.new()
 

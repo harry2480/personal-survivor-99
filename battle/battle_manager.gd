@@ -26,6 +26,7 @@ var _next_player_id: int = 0
 var _phase: BattlePhase.Phase = BattlePhase.Phase.OPENING
 var _finished: bool = false
 var _battle_seed: int = 0
+var _elapsed_sec: float = 0.0
 
 
 func _init(rules: GameRules = null, balance: GameBalance = null) -> void:
@@ -43,6 +44,7 @@ func setup(human_count: int, cpu_count: int, battle_seed: int = 0) -> void:
 	_next_player_id = 0
 	_finished = false
 	_battle_seed = battle_seed
+	_elapsed_sec = 0.0
 
 	for _i in range(maxi(0, human_count)):
 		add_player(PlayerType.Type.LOCAL_HUMAN)
@@ -120,10 +122,20 @@ func get_battle_seed() -> int:
 	return _battle_seed
 
 
+## Battle 開始からの経過時間（秒）を返す。
+##
+## KO の帰属判定（適用時刻と判定時刻）がこの時刻を基準にする。
+## Garbage の活性時刻は受け手の Session の時計で決める（[GarbageRouter]）。
+func get_elapsed_sec() -> float:
+	return _elapsed_sec
+
+
 ## 全 Player の時間を進め、Danger Level と Incoming を更新する。
 func update(delta_sec: float) -> void:
 	if _finished:
 		return
+
+	_elapsed_sec += maxf(0.0, delta_sec)
 
 	for player in _players:
 		# 同じ update 内の同時 Top Out で Battle が終わったら、勝者を脱落させない。

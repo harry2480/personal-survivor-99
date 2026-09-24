@@ -46,6 +46,11 @@ extends Resource
 ## Garbage Line の Hole の開け方（[enum GarbageHoleGenerator.Mode]）。
 @export var garbage_hole_mode: int = GarbageHoleGenerator.Mode.SAME_COLUMN_PER_EVENT
 
+## KO を攻撃者の手柄とみなす時間（秒。要件定義 §56）。
+##
+## Garbage が適用されてからこの時間以内に Top Out したら、その攻撃者の KO とする。
+@export_range(0.0, 30.0, 0.5, "or_greater") var ko_attribution_window_sec: float = 5.0
+
 ## Combo 段数ごとの Attack 加算値。
 ##
 ## index は「連続 Line Clear 数 - 1」。1 回目の Clear は Combo 0 として index 0 を見る。
