@@ -61,7 +61,7 @@ func update(delta_sec: float) -> bool:
 		if _reaction_timer_sec > GameRules.ACCUMULATION_EPSILON:
 			return false
 		# 反応し終えた余りは配置の時間へ回す。
-		step = -_reaction_timer_sec
+		step = maxf(0.0, -_reaction_timer_sec)
 		_reaction_timer_sec = 0.0
 
 	_place_timer_sec += step
@@ -73,9 +73,13 @@ func update(delta_sec: float) -> bool:
 	return true
 
 
-## 配置直後に呼ぶ。溜まった時間を捨てる。
+## 配置直後に呼ぶ。溜まった時間のうち、1 間隔に満たない端数だけを残す。
+##
+## 端数まで捨てると、間隔がフレームの倍数でないときに毎回切り捨てが起き、
+## PPS がフレームレートで変わる（4 PPS が 30fps では 3.75 PPS になる）。
+## 丸ごと 1 間隔ぶん以上溜まっていた場合（処理落ちなど）は捨て、まとめ置きはしない。
 func notify_placed() -> void:
-	_place_timer_sec = 0.0
+	_place_timer_sec = fmod(maxf(0.0, _place_timer_sec), get_place_interval_sec())
 
 
 ## 状態を初期化する。
