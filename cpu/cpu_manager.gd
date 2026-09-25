@@ -147,6 +147,13 @@ func promote(player_id: int, reason: String = "") -> bool:
 	var indicators: CpuIndicators = get_indicators(player_id)
 	_apply_indicators_to_board(player.session.get_board(), indicators)
 
+	# Lightweight が受けて、まだ捌いていない Garbage を Game Core の Queue へ渡す。
+	# Queue は前回の降格時の中身が残っているので（その行数は指標へ移してある）、
+	# 先に空にしてから入れる。二重に数えないため。
+	player.session.get_garbage_queue().clear()
+	if indicators.incoming_garbage > 0:
+		player.session.receive_garbage_lines(indicators.incoming_garbage)
+
 	_detailed[player_id] = DetailedCpu.new(_profiles[player_id], player.session, _seed + player_id)
 	_lightweight.erase(player_id)
 	_set_mode(player_id, Mode.DETAILED, reason)

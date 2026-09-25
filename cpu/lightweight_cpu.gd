@@ -17,15 +17,16 @@ var _indicators: CpuIndicators = CpuIndicators.new()
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _timer_sec: float = 0.0
 var _pending_attack: float = 0.0
+var _pending_defense: float = 0.0
 var _update_count: int = 0
 
 
 func _init(profile: CpuProfile = null, cpu_seed: int = 0) -> void:
 	_profile = profile if profile != null else CpuProfile.create_default()
 	_rng.seed = cpu_seed
-	_indicators.skill = clampf(_profile.strength / 100.0, 0.0, 2.0)
-	_indicators.attack_rate = _estimate_attack_rate()
-	_indicators.defense_rate = _estimate_defense_rate()
+	_indicators.skill = CpuIndicators.estimate_skill(_profile)
+	_indicators.attack_rate = CpuIndicators.estimate_attack_rate(_profile)
+	_indicators.defense_rate = CpuIndicators.estimate_defense_rate(_profile)
 
 
 ## 現在の指標を返す。
@@ -36,9 +37,9 @@ func get_indicators() -> CpuIndicators:
 ## 指標を外から与える（Detailed から降格してきたときに使う）。
 func adopt(indicators: CpuIndicators) -> void:
 	_indicators.copy_from(indicators)
-	_indicators.skill = clampf(_profile.strength / 100.0, 0.0, 2.0)
-	_indicators.attack_rate = _estimate_attack_rate()
-	_indicators.defense_rate = _estimate_defense_rate()
+	_indicators.skill = CpuIndicators.estimate_skill(_profile)
+	_indicators.attack_rate = CpuIndicators.estimate_attack_rate(_profile)
+	_indicators.defense_rate = CpuIndicators.estimate_defense_rate(_profile)
 
 
 ## これまでに指標を更新した回数を返す。周期の検証に使う。
@@ -77,9 +78,11 @@ func is_over() -> bool:
 
 func _step_once() -> int:
 	# 受けた Garbage を腕前に応じて捌く。捌けなかったぶんが積み上がる。
-	var cleared: int = mini(
-		_indicators.incoming_garbage, int(_indicators.defense_rate * UPDATE_INTERVAL_SEC)
-	)
+	# 1 周期ぶんの防御量は 1 行に満たないことが多いので、Attack と同じく端数を溜める。
+	# 使わなかった丸ごとの行は捨てる（平時に溜め込んで、後でまとめて捌かないため）。
+	_pending_defense += _indicators.defense_rate * UPDATE_INTERVAL_SEC
+	var cleared: int = mini(_indicators.incoming_garbage, int(_pending_defense))
+	_pending_defense = fmod(_pending_defense - float(cleared), 1.0)
 	_indicators.incoming_garbage -= cleared
 	_indicators.stack_height += _indicators.incoming_garbage
 	_indicators.incoming_garbage = 0
@@ -113,13 +116,3 @@ func _refresh_danger() -> void:
 		_indicators.danger_level = DangerLevel.Level.WARNING
 	else:
 		_indicators.danger_level = DangerLevel.Level.SAFE
-
-
-# 腕前と PPS から、1 秒あたりに出す Attack 行数を見積もる。
-func _estimate_attack_rate() -> float:
-	return _profile.pieces_per_second * _indicators.skill * 0.25
-
-
-# 腕前と PPS から、1 秒あたりに捌ける Garbage 行数を見積もる。
-func _estimate_defense_rate() -> float:
-	return _profile.pieces_per_second * clampf(_profile.garbage_skill, 0.0, 1.0) * 0.5

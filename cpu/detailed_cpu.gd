@@ -32,12 +32,10 @@ func get_session() -> PuzzleSession:
 ## 現在の指標を返す（Lightweight と同じ形）。
 func get_indicators() -> CpuIndicators:
 	var indicators: CpuIndicators = CpuIndicators.from_board(_session.get_board(), _metrics)
-	indicators.skill = clampf(_profile.strength / 100.0, 0.0, 2.0)
+	indicators.skill = CpuIndicators.estimate_skill(_profile)
 	indicators.incoming_garbage = _session.get_garbage_queue().get_pending_lines()
-	indicators.attack_rate = _profile.pieces_per_second * indicators.skill * 0.25
-	indicators.defense_rate = (
-		_profile.pieces_per_second * clampf(_profile.garbage_skill, 0.0, 1.0) * 0.5
-	)
+	indicators.attack_rate = CpuIndicators.estimate_attack_rate(_profile)
+	indicators.defense_rate = CpuIndicators.estimate_defense_rate(_profile)
 	return indicators
 
 
@@ -75,19 +73,38 @@ func place_once() -> bool:
 		return false
 
 	var best: Placement = _search.search(
-		_session.get_board(), active.type, _session.get_next_types(2)
+		_session.get_board(), active.type, _session.get_next_types(2), _get_hold_type()
 	)
 	if best == null:
 		return false
 
 	var chosen: Placement = _misdrop.apply(_session.get_board(), best)
 
-	# Hold の取り違えは種類が変わるので、Hold を使って出し直す。
-	if chosen.uses_hold != best.uses_hold and _session.get_hold_slot().can_hold():
+	# 最終的な判断（Misdrop で取り違えた後）に従って Hold する。
+	if chosen.uses_hold and _session.get_hold_slot().can_hold():
 		_session.hold()
-		return true
+		active = _session.get_active_piece()
+
+	# Hold の取り違えで、選んだ配置が今の Piece のものでなくなった場合は探し直す。
+	# 取り違えの結果として出てきた Piece なので、Misdrop はもう掛けない。
+	if chosen.piece_type != active.type:
+		chosen = _search.search(_session.get_board(), active.type, _session.get_next_types(2))
+		if chosen == null:
+			return false
 
 	active.rotation = chosen.rotation
 	active.position = chosen.position
 	_session.hard_drop()
 	return true
+
+
+# Hold したときに出てくる Piece の種類。Hold できなければ -1（候補に入れない）。
+# Hold が空なら NEXT の先頭が出てくる（[PlacementSearch] はこの判断を呼び出し側に任せている）。
+func _get_hold_type() -> int:
+	var hold_slot: HoldSlot = _session.get_hold_slot()
+	if not hold_slot.can_hold():
+		return -1
+	if not hold_slot.is_empty():
+		return hold_slot.get_held_type()
+	var next_types: Array[int] = _session.get_next_types(1)
+	return next_types[0] if not next_types.is_empty() else -1

@@ -83,6 +83,35 @@ func test_lightweight_receives_garbage() -> void:
 	assert_eq(cpus.get_indicators(1).incoming_garbage, 4, "受信待ちが増える")
 
 
+func test_mid_strength_lightweight_clears_some_garbage() -> void:
+	# 1 周期ぶんの防御量が 1 行に満たない強さでも、端数を溜めて少しずつ捌く。
+	var profile: CpuProfile = mapping.create_profile(60.0)
+	assert_lt(
+		CpuIndicators.estimate_defense_rate(profile) * LightweightCpu.UPDATE_INTERVAL_SEC,
+		1.0,
+		"前提: 1 周期では 1 行に届かない"
+	)
+	var lightweight := LightweightCpu.new(profile, SEED)
+	var received: int = 0
+	for _frame in range(600):
+		lightweight.receive_garbage(1)
+		received += 1
+		lightweight.update(1.0 / 60.0)
+
+	# 捌いたぶんと自分で掘ったぶんがあるので、積み上がりは受けた行数より少ない。
+	var no_defense := LightweightCpu.new(profile, SEED)
+	no_defense.get_indicators().defense_rate = 0.0
+	for _frame in range(600):
+		no_defense.receive_garbage(1)
+		no_defense.update(1.0 / 60.0)
+
+	assert_lt(
+		lightweight.get_indicators().stack_height,
+		no_defense.get_indicators().stack_height,
+		"Garbage を捌いたぶん低い（受信 %d 行）" % received
+	)
+
+
 func test_lightweight_generates_attacks_over_time() -> void:
 	var lightweight := LightweightCpu.new(mapping.create_profile(100.0), SEED)
 
@@ -116,6 +145,33 @@ func test_promotion_attaches_a_board_state() -> void:
 	assert_not_null(manager.get_player(1).get_board(), "Board State を持つ")
 
 
+func test_promotion_keeps_the_incoming_garbage() -> void:
+	# 周期の途中で昇格しても、受信待ちの Garbage を落とさない。
+	cpus.receive_garbage(1, 3)
+
+	cpus.promote(1, "test")
+
+	assert_eq(
+		manager.get_player(1).session.get_garbage_queue().get_pending_lines(),
+		3,
+		"Game Core の Queue に行数が残る"
+	)
+
+
+func test_round_trip_does_not_double_the_incoming_garbage() -> void:
+	cpus.promote(1, "test")
+	cpus.receive_garbage(1, 2)
+	cpus.demote(1, "test")
+
+	cpus.promote(1, "test")
+
+	assert_eq(
+		manager.get_player(1).session.get_garbage_queue().get_pending_lines(),
+		2,
+		"降格前の Queue の中身と指標の行数を二重に数えない"
+	)
+
+
 func test_detailed_places_pieces_over_time() -> void:
 	cpus.promote(1, "test")
 	var before: int = _count_filled(manager.get_player(1).get_board())
@@ -124,6 +180,41 @@ func test_detailed_places_pieces_over_time() -> void:
 		cpus.update(1.0 / 60.0)
 
 	assert_gt(_count_filled(manager.get_player(1).get_board()), before, "実際に積み上がる")
+
+
+func _run_detailed(misdrop_rate: float, placements: int) -> Array[int]:
+	# [置けた回数, Hold した回数] を返す。品質 1.0（Strength 100）にして選択のぶれを除く。
+	var profile: CpuProfile = mapping.create_profile(100.0)
+	profile.misdrop_rate = misdrop_rate
+	var session: PuzzleSession = manager.get_player(1).session
+	var detailed := DetailedCpu.new(profile, session, SEED)
+	var holds: Array[int] = [0]
+	session.piece_held.connect(func(_type: int) -> void: holds[0] += 1)
+
+	var placed: int = 0
+	for _attempt in range(placements):
+		if session.is_over():
+			break
+		var before: int = _count_filled(session.get_board())
+		if detailed.place_once() and _count_filled(session.get_board()) != before:
+			placed += 1
+	return [placed, holds[0]]
+
+
+func test_detailed_uses_hold_when_it_scores_better() -> void:
+	# Hold の候補も探索に入れる。Misdrop なしでも Hold を使う場面がある。
+	var result: Array[int] = _run_detailed(0.0, 40)
+
+	assert_gt(result[1], 0, "Hold を使う")
+	assert_eq(result[0], 40, "Hold した手も実際に置く")
+
+
+func test_hold_misdrop_still_places_the_active_piece() -> void:
+	# Hold の取り違えが起きても、出てきた Piece で置き直して 1 手を終える。
+	var result: Array[int] = _run_detailed(1.0, 40)
+
+	assert_gt(result[1], 0, "Hold の取り違えが起きる")
+	assert_eq(result[0], 40, "毎回 1 手置き切る")
 
 
 # --- 切り替えの連続性（#42 の完了条件） -------------------------------------

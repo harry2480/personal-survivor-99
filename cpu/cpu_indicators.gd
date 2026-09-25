@@ -48,6 +48,27 @@ static func from_board(board: Board, metrics: BoardMetrics = null) -> CpuIndicat
 	return indicators
 
 
+## Profile から腕前（0.0〜2.0）を決める。Strength 100 で 1.0。
+static func estimate_skill(profile: CpuProfile) -> float:
+	return clampf(profile.strength / 100.0, 0.0, 2.0)
+
+
+## Profile から、1 秒あたりに出す Attack 行数を見積もる。
+##
+## Detailed / Lightweight で同じ見積もりを使う。切り替えで値が飛ばないため。
+static func estimate_attack_rate(profile: CpuProfile) -> float:
+	return profile.pieces_per_second * estimate_skill(profile) * profile.attack_rate_factor
+
+
+## Profile から、1 秒あたりに捌ける Garbage 行数を見積もる。
+static func estimate_defense_rate(profile: CpuProfile) -> float:
+	return (
+		profile.pieces_per_second
+		* clampf(profile.garbage_skill, 0.0, 1.0)
+		* profile.defense_rate_factor
+	)
+
+
 ## 別の指標の内容を写す。
 func copy_from(other: CpuIndicators) -> void:
 	if other == null:
