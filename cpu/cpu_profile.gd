@@ -14,6 +14,25 @@ extends Resource
 ## Profile の名前。
 @export var profile_name: String = "Default"
 
+# --- 探索のパラメータ（§62〜§64） -------------------------------------------
+
+## 配置の質（要件定義 §62）。
+##
+## 1.0 で常に最良の候補、下げるほど上位候補から準ランダムに選ぶ。
+@export_range(0.0, 1.0, 0.01) var placement_quality: float = 1.0
+
+## 先読みで深く読む候補の数（Beam Width）。
+##
+## 到達できる配置は 40 前後あり、全部を深く読むと 1 手に数十 ms かかる
+## （scripts/benchmark-cpu.sh の計測）。まず浅く並べ、上位だけを深く読む。
+@export_range(1, 40, 1) var beam_width: int = 8
+
+## NEXT を何手先まで見るか（要件定義 §64）。
+##
+## 0 で現在 Piece だけ。探索の深さは
+## [constant PlacementSearch.MAX_SEARCH_DEPTH] で打ち切られる。
+@export_range(0, 5, 1) var lookahead: int = 1
+
 # --- 評価の軸（§61） --------------------------------------------------------
 
 ## 穴を避ける度合い。穴の数と深さに掛かる。

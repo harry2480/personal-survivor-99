@@ -91,6 +91,32 @@ func test_measuring_twice_does_not_accumulate() -> void:
 	assert_eq(metrics.holes, first_holes, "使い回しても値が積み上がらない")
 
 
+func test_empty_board_resets_heights_and_counts_wall_transitions() -> void:
+	# 先に積んだ盤面を測ってから空盤面を測る。列の高さが前回のまま残らないこと。
+	board.set_cell(3, Board.TOTAL_HEIGHT - 4, Piece.Type.I)
+	var metrics := BoardMetrics.new()
+	metrics.measure(board)
+
+	metrics.measure(Board.new())
+
+	assert_eq(metrics.get_heights()[3], 0, "空盤面では列の高さが 0 に戻る")
+	# 空行は左右の壁との境で 2 回、空列は床との境で 1 回切り替わる。
+	assert_eq(metrics.row_transitions, 2 * Board.TOTAL_HEIGHT, "空行も切り替わりに数える")
+	assert_eq(metrics.column_transitions, Board.WIDTH, "空列も床との境を数える")
+
+
+func test_row_transitions_count_the_empty_rows_above_the_stack() -> void:
+	# 走査を積み上げの上端から始めても、上の空行ぶんを落とさないこと。
+	board.set_cell(0, Board.TOTAL_HEIGHT - 1, Piece.Type.I)
+	var metrics := BoardMetrics.new()
+
+	metrics.measure(board)
+
+	# 空行 39 行 × 2 + 最下段（埋まり 1 → 空き 9 → 右の壁）の 2。
+	assert_eq(metrics.row_transitions, 2 * (Board.TOTAL_HEIGHT - 1) + 2, "上の空行も数える")
+	assert_eq(metrics.column_transitions, Board.WIDTH, "各列 1 回ずつ")
+
+
 func test_garbage_rows_under_a_lid_are_blocked() -> void:
 	GarbageQueue.push_lines(board, PackedInt32Array([3, 3]))
 	# 2 行とも同じ列に穴があり、その上に蓋をする。下の行の真上は空きのまま。
