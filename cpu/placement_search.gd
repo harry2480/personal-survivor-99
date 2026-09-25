@@ -28,12 +28,12 @@ const MAX_VISITED_STATES: int = Board.WIDTH * Board.TOTAL_HEIGHT * Piece.ROTATIO
 ##
 ## 計測結果（Apple Silicon / Godot 4.7.2 / 積み上がった盤面）:
 ## [codeblock]
-## 深さ 1 →    6.0 ms / 手
-## 深さ 2 →   55   ms / 手
-## 深さ 3 → 3225   ms / 手   ← 1 手に 3 秒。実用にならない
+## 深さ 1 →   5.9 ms / 手
+## 深さ 2 →  45   ms / 手
+## 深さ 3 → 670   ms / 手   ← 1 手に 0.7 秒。実用にならない
 ## [/codeblock]
 ##
-## 深さ 3 は Beam を掛けても深さ 2 の 58 倍になる。上限を 2 に置く。
+## 深さ 3 は Beam を掛けても深さ 2 の 15 倍になる。上限を 2 に置く。
 ##
 ## 深さ 1 でも 99 体ぶんを同じフレームで走らせると 1 フレームの予算
 ## （60fps = 16.7 ms）を大きく超える。CPU は Piece ごとにしか考えないので
@@ -55,12 +55,18 @@ var _evaluator: BoardEvaluator
 var _rotation: RotationSystem = RotationSystem.new()
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _scratch_board: Board = Board.new()
+var _max_depth: int = MAX_SEARCH_DEPTH
 
 
-func _init(profile: CpuProfile = null, search_seed: int = 0) -> void:
+## [param max_depth] は計測（tools/benchmark_cpu_search.gd）が上限の先を測るための
+## 入口。ゲームからは渡さず、[constant MAX_SEARCH_DEPTH] のままにする。
+func _init(
+	profile: CpuProfile = null, search_seed: int = 0, max_depth: int = MAX_SEARCH_DEPTH
+) -> void:
 	_profile = profile if profile != null else CpuProfile.create_default()
 	_evaluator = BoardEvaluator.new(_profile)
 	_rng.seed = search_seed
+	_max_depth = maxi(1, max_depth)
 
 
 ## Seed を指定して選択をやり直せるようにする。
@@ -75,12 +81,15 @@ func get_profile() -> CpuProfile:
 
 ## 実際に使う探索の深さを返す（Profile の値を絶対上限で打ち切ったもの）。
 func get_effective_depth() -> int:
-	return clampi(1 + _profile.lookahead, 1, MAX_SEARCH_DEPTH)
+	return clampi(1 + _profile.lookahead, 1, _max_depth)
 
 
 ## Spawn から到達できる配置をすべて返す。
 ##
 ## 返るのは「そこで固定できる（接地している）」状態だけ。
+## 占めるセルが同じ置き方は 1 件にまとめる（O は 4 回転とも、I / S / Z は
+## 対になる回転が同じセルを占める）。置いた後の盤面が同じなので評価も同じで、
+## 残すと Beam の枠を同じ置き方で埋めてしまう。
 ##
 ## 1 手あたり数千回の判定になるため、状態は int へ畳んで [Dictionary] に入れ、
 ## 展開も配列を作らずに行う。[RotationResult] も作らない。
@@ -91,6 +100,7 @@ func find_reachable_placements(board: Board, piece_type: int) -> Array[Placement
 		return placements
 
 	var visited: Dictionary = {}
+	var footprints: Dictionary = {}
 	var queue: Array[int] = []
 	var head: int = 0
 
@@ -109,7 +119,11 @@ func find_reachable_placements(board: Board, piece_type: int) -> Array[Placement
 		var position := Vector2i(x, y)
 
 		if Collision.is_on_ground(board, piece_type, rotation, position):
-			placements.append(Placement.create(piece_type, rotation, position))
+			# 幅優先の順は決定論的なので、先に見つかった置き方を代表に残す。
+			var footprint: int = _encode_footprint(piece_type, rotation, position)
+			if not footprints.has(footprint):
+				footprints[footprint] = true
+				placements.append(Placement.create(piece_type, rotation, position))
 
 		_push_moves(board, piece_type, position, rotation, visited, queue)
 		_push_rotations(board, piece_type, position, rotation, visited, queue)
@@ -138,26 +152,34 @@ func rank_candidates(
 ) -> Array[Placement]:
 	var candidates: Array[Placement] = _collect_candidates(board, current_type, hold_type)
 	_score_all(board, candidates, next_types)
-	candidates.sort_custom(_compare_by_score)
 	return candidates
 
 
-# 候補に評価値を入れる。
+# 候補に評価値を入れ、選ぶ順に並べる。
 #
 # 深く読むのは上位 [member CpuProfile.beam_width] 件だけ。到達できる配置は 40 前後
 # あり、全部を深く読むと 1 手に数十 ms かかるため（計測: scripts/benchmark-cpu.sh）。
+#
+# Beam 内（深い評価）と Beam 外（浅い評価）は尺度が違うので、混ぜて並べ直さない。
+# 混ぜると、先読みで点が下がった Beam 内の候補を Beam 外の候補が追い越す。
+# Beam 内だけを並べ直して先頭に置き、Beam 外は浅い評価の順で後ろに残す。
 func _score_all(board: Board, candidates: Array[Placement], next_types: Array[int]) -> void:
 	for placement in candidates:
 		placement.score = _score_placement(board, placement, next_types, 0)
+	candidates.sort_custom(_compare_by_score)
 
 	var depth: int = get_effective_depth()
-	if depth <= 1 or next_types.is_empty():
+	if depth <= 1 or next_types.is_empty() or candidates.is_empty():
 		return
 
-	candidates.sort_custom(_compare_by_score)
 	var beam: int = clampi(_profile.beam_width, 1, candidates.size())
 	for index in range(beam):
 		candidates[index].score = _score_placement(board, candidates[index], next_types, depth - 1)
+
+	var ranked_beam: Array[Placement] = candidates.slice(0, beam)
+	ranked_beam.sort_custom(_compare_by_score)
+	for index in range(beam):
+		candidates[index] = ranked_beam[index]
 
 
 func _collect_candidates(board: Board, current_type: int, hold_type: int) -> Array[Placement]:
@@ -201,9 +223,8 @@ func _score_placement(
 
 # Placement Quality に応じて候補を選ぶ（要件定義 §62）。
 # 1.0 で常に最良、下げるほど上位候補から準ランダムに選ぶ。
+# candidates は [method _score_all] が並べた順のまま受け取る。
 func _choose(candidates: Array[Placement]) -> Placement:
-	candidates.sort_custom(_compare_by_score)
-
 	var quality: float = clampf(_profile.placement_quality, 0.0, 1.0)
 	if is_equal_approx(quality, 1.0) or candidates.size() == 1:
 		return candidates[0]
@@ -262,6 +283,20 @@ func _push_rotations(
 		if not visited.has(state):
 			visited[state] = true
 			queue.append(state)
+
+
+# 占めるセルの集合を 1 つの int へ畳む。回転や位置が違っても、セルが同じなら同じ値。
+# セルは盤内（index < 512）なので 9 bit ずつ、並べ替えて 4 つ詰める。
+static func _encode_footprint(piece_type: int, rotation: int, position: Vector2i) -> int:
+	var indices: Array[int] = []
+	for cell in Collision.get_cells(piece_type, rotation, position):
+		indices.append(cell.y * Board.WIDTH + cell.x)
+	indices.sort()
+
+	var key: int = 0
+	for index in indices:
+		key = (key << 9) | index
+	return key
 
 
 # 状態を 1 つの int へ畳む。x は負にもなるため下駄を履かせる。

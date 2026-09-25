@@ -156,18 +156,78 @@ func test_depth_never_exceeds_the_absolute_limit() -> void:
 		)
 
 
-func test_lookahead_changes_the_evaluation() -> void:
-	# 先読みの有無で候補の評価が変わること（深さが実際に効いていること）。
-	_stack([5, 5, 5, 5, 5, 5, 5, 5, 5, 1])
-	var next_types: Array[int] = [Piece.Type.I, Piece.Type.O]
+func test_lookahead_picks_a_better_placement() -> void:
+	# 先読みすると、深さ 1 とは別の、先を見て良い置き方を選ぶこと。
+	# 比べるときは両方の置き方を同じ深さ 2 の評価で測る（Beam を全候補に広げる）。
+	# 幅 2 の溝。I を 2 本続けて縦に入れれば 4 段消せる。
+	_stack([4, 4, 4, 4, 4, 4, 4, 4, 0, 0])
+	var next_types: Array[int] = [Piece.Type.I]
+	profile.beam_width = 40
 
 	profile.lookahead = 0
-	var shallow: Array[Placement] = search.rank_candidates(board, Piece.Type.S, next_types)
+	var shallow_choice: Placement = search.search(board, Piece.Type.I, next_types)
 
 	profile.lookahead = 1
-	var deep: Array[Placement] = search.rank_candidates(board, Piece.Type.S, next_types)
+	var deep_choice: Placement = search.search(board, Piece.Type.I, next_types)
+	var deep_scores: Dictionary = {}
+	for placement in search.rank_candidates(board, Piece.Type.I, next_types):
+		deep_scores[Vector3i(placement.position.x, placement.position.y, placement.rotation)] = (
+			placement.score
+		)
 
-	assert_ne(shallow[0].score, deep[0].score, "先読みすると評価値が変わる")
+	assert_false(deep_choice.equals(shallow_choice), "先読みすると選ぶ置き方が変わる")
+	assert_gt(
+		deep_scores[Vector3i(deep_choice.position.x, deep_choice.position.y, deep_choice.rotation)],
+		deep_scores[Vector3i(
+			shallow_choice.position.x, shallow_choice.position.y, shallow_choice.rotation
+		)],
+		"深さ 2 の評価で、先読みの選択の方が高い"
+	)
+
+
+func test_lookahead_choice_stays_within_the_beam() -> void:
+	# Beam 外の候補は浅い評価のまま。先読みした候補と混ぜて比べないこと。
+	# Beam 1 件なら、選ばれるのは浅い評価で一番の候補（= 深さ 1 の選択）になる。
+	_stack([3, 1, 4, 2, 5, 3, 1, 4, 2, 3])
+	# この盤面では先読みで点が下がるため、Beam 外の 2 番手が浅い評価のまま上に来る。
+	var next_types: Array[int] = [Piece.Type.O]
+	profile.beam_width = 1
+
+	profile.lookahead = 0
+	var shallow_choice: Placement = search.search(board, Piece.Type.J, next_types)
+
+	profile.lookahead = 1
+	var deep_choice: Placement = search.search(board, Piece.Type.J, next_types)
+
+	assert_true(deep_choice.equals(shallow_choice), "Beam 外の候補は選ばれない")
+
+
+func test_rank_candidates_returns_every_candidate_with_lookahead() -> void:
+	_stack([3, 1, 4, 2, 5, 3, 1, 4, 2, 3])
+	profile.lookahead = 1
+	profile.beam_width = 1
+
+	var ranked: Array[Placement] = search.rank_candidates(
+		board, Piece.Type.T, [Piece.Type.I, Piece.Type.J]
+	)
+
+	assert_eq(
+		ranked.size(), search.find_reachable_placements(board, Piece.Type.T).size(), "Beam 外の候補も返す"
+	)
+
+
+func test_placements_with_the_same_cells_are_merged() -> void:
+	# O は 4 回転とも同じセルを占める。置いた後の盤面が同じ置き方は 1 件にまとめる。
+	var footprints: Dictionary = {}
+	for placement in search.find_reachable_placements(board, Piece.Type.O):
+		var cells: Array[Vector2i] = Collision.get_cells(
+			Piece.Type.O, placement.rotation, placement.position
+		)
+		cells.sort()
+		assert_false(footprints.has(cells), "同じセルを占める置き方が重複しない")
+		footprints[cells] = true
+
+	assert_eq(footprints.size(), Board.WIDTH - 1, "空盤面の O は横位置の数だけ")
 
 
 func test_lookahead_does_not_break_validity() -> void:

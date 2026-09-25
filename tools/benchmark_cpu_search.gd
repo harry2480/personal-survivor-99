@@ -46,7 +46,8 @@ func _init() -> void:
 func _measure(lookahead: int) -> bool:
 	var profile := CpuProfile.create_default()
 	profile.lookahead = lookahead
-	var search := PlacementSearch.new(profile, SEED)
+	# 上限の先（深さ 3）も測れるように、ゲームより 1 段深くまで許す。
+	var search := PlacementSearch.new(profile, SEED, PlacementSearch.MAX_SEARCH_DEPTH + 1)
 	var randomizer := PieceRandomizer.new(SEED)
 	var board: Board = _make_board()
 

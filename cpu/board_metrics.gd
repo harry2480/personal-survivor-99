@@ -55,12 +55,13 @@ func measure(board: Board) -> void:
 
 	# 盤面の大半は空。走査を「一番上のブロック」から下だけに絞る。
 	# 99 体ぶんを繰り返し呼ぶため、ここの差が効く（#38 の制約）。
+	# 空盤面でも呼ぶ。列の高さのバッファを 0 に戻すため。
 	var top_y: int = board.get_top_filled_y()
-	if top_y >= Board.TOTAL_HEIGHT:
-		return
-
 	_measure_columns(board, top_y)
 	_measure_rows(board, top_y)
+	# 走査しなかった空行も、左右の壁との境で 1 行につき 2 回切り替わる。
+	# 数えないと、高く積むほど切り替わりが増えて見え、高さの評価と二重になる。
+	row_transitions += 2 * top_y
 	danger_ratio = DangerLevel.get_ratio(board)
 
 
