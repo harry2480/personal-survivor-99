@@ -44,6 +44,8 @@ func test_higher_strength_improves_every_parameter() -> void:
 	assert_gt(strong.technique_usage, weak.technique_usage, "テクニックを使う")
 	assert_gt(strong.garbage_skill, weak.garbage_skill, "Garbage がうまくなる")
 	assert_gt(strong.target_skill, weak.target_skill, "Target がうまくなる")
+	assert_gt(strong.garbage_management, weak.garbage_management, "Garbage 行を嫌う")
+	assert_gt(strong.recovery_ability, weak.recovery_ability, "危険な盤面から立て直す")
 
 
 func test_parameters_change_monotonically() -> void:
@@ -61,6 +63,21 @@ func test_parameters_change_monotonically() -> void:
 		assert_true(
 			current.misdrop_rate <= previous.misdrop_rate, "Strength %d でミスが増えない" % strength
 		)
+		for property in [
+			"placement_quality",
+			"lookahead",
+			"technique_usage",
+			"garbage_skill",
+			"target_skill",
+			"hole_avoidance",
+			"surface_management",
+			"garbage_management",
+			"recovery_ability",
+		]:
+			assert_true(
+				current.get(property) >= previous.get(property),
+				"Strength %d で %s が下がらない" % [strength, property]
+			)
 		previous = current
 
 
@@ -108,6 +125,20 @@ func test_invalid_table_is_detected() -> void:
 	mapping.strength_points = PackedFloat32Array([50.0, 10.0])
 
 	assert_false(mapping.is_valid(), "昇順でない表は不正")
+
+
+func test_table_with_a_missing_value_is_invalid() -> void:
+	mapping.pieces_per_second = PackedFloat32Array([0.8, 1.5, 2.5])
+
+	assert_false(mapping.is_valid(), "節点と値の数が合わない表は不正")
+
+
+func test_config_file_matches_the_script_defaults() -> void:
+	# config/ の表はゲームが読み込む実データ。形が崩れていないこと。
+	var loaded: CpuStrengthMapping = load("res://config/cpu_strength_mapping.tres")
+
+	assert_not_null(loaded, "読み込める")
+	assert_true(loaded.is_valid(), "節点と値の数がそろっている")
 
 
 # --- Preset（要件定義 §60） -------------------------------------------------

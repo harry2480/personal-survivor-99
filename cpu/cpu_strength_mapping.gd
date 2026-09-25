@@ -50,6 +50,13 @@ var placement_quality: PackedFloat32Array = PackedFloat32Array([0.15, 0.4, 0.6, 
 @export
 var surface_management: PackedFloat32Array = PackedFloat32Array([0.3, 0.6, 1.0, 1.2, 1.4, 1.5])
 
+## 節点ごとの Garbage のさばき方の強さ（評価の軸。要件定義 §61）。
+@export
+var garbage_management: PackedFloat32Array = PackedFloat32Array([0.4, 0.7, 1.0, 1.2, 1.4, 1.5])
+
+## 節点ごとの立て直しの強さ（評価の軸。要件定義 §61）。
+@export var recovery_ability: PackedFloat32Array = PackedFloat32Array([0.4, 0.7, 1, 1.2, 1.4, 1.5])
+
 
 ## 既定の変換表を作る。
 static func create_default() -> CpuStrengthMapping:
@@ -72,6 +79,8 @@ func create_profile(strength: float) -> CpuProfile:
 	profile.target_skill = clampf(sample(target_skill, strength), 0.0, 1.0)
 	profile.hole_avoidance = maxf(0.0, sample(hole_avoidance, strength))
 	profile.surface_management = maxf(0.0, sample(surface_management, strength))
+	profile.garbage_management = maxf(0.0, sample(garbage_management, strength))
+	profile.recovery_ability = maxf(0.0, sample(recovery_ability, strength))
 
 	return profile
 
@@ -100,13 +109,36 @@ func sample(values: PackedFloat32Array, strength: float) -> float:
 
 
 ## 変換表の形が正しいかを返す。差し替えたときの検証に使う。
+##
+## 節点が昇順であることに加え、どの列も節点と同じ数の値を持つこと。
+## 数が違うと [method sample] は短い方に合わせてしまい、端の延長がずれる。
 func is_valid() -> bool:
 	if strength_points.size() < 2:
 		return false
 	for index in range(1, strength_points.size()):
 		if strength_points[index] <= strength_points[index - 1]:
 			return false
+	for values in _get_tables():
+		if values.size() != strength_points.size():
+			return false
 	return true
+
+
+func _get_tables() -> Array[PackedFloat32Array]:
+	return [
+		reaction_time_sec,
+		pieces_per_second,
+		misdrop_rate,
+		placement_quality,
+		lookahead,
+		technique_usage,
+		garbage_skill,
+		target_skill,
+		hole_avoidance,
+		surface_management,
+		garbage_management,
+		recovery_ability,
+	]
 
 
 func _extrapolate(values: PackedFloat32Array, left: int, right: int, strength: float) -> float:
