@@ -139,6 +139,12 @@ func test_config_file_matches_the_script_defaults() -> void:
 
 	assert_not_null(loaded, "読み込める")
 	assert_true(loaded.is_valid(), "節点と値の数がそろっている")
+	# 既定値はスクリプトと .tres の 2 か所にある。片方だけ直すとずれるので突き合わせる。
+	assert_eq(loaded.strength_points, mapping.strength_points, "節点がスクリプトの既定値と一致する")
+	var loaded_tables: Array[PackedFloat32Array] = loaded._get_tables()
+	var default_tables: Array[PackedFloat32Array] = mapping._get_tables()
+	for index in range(default_tables.size()):
+		assert_eq(loaded_tables[index], default_tables[index], "表 %d がスクリプトの既定値と一致する" % index)
 
 
 # --- Preset（要件定義 §60） -------------------------------------------------
