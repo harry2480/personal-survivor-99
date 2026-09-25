@@ -33,6 +33,31 @@ extends Resource
 ## [constant PlacementSearch.MAX_SEARCH_DEPTH] で打ち切られる。
 @export_range(0, 5, 1) var lookahead: int = 1
 
+# --- 人間的な制約（§65〜§67） -----------------------------------------------
+
+## この CPU の Strength。変換元の値を残しておく（要件定義 §59）。
+@export_range(0.0, 200.0, 1.0, "or_greater") var strength: float = 50.0
+
+## 反応遅延（秒。要件定義 §65）。Garbage 受信や Target 変更への反応が遅れる。
+@export_range(0.0, 1.0, 0.005, "or_greater") var reaction_time_sec: float = 0.15
+
+## 1 秒あたりに置く Piece 数（PPS。要件定義 §66）。
+@export_range(0.1, 20.0, 0.1, "or_greater") var pieces_per_second: float = 2.5
+
+## 意図しない配置が起きる確率（要件定義 §67）。
+@export_range(0.0, 1.0, 0.001) var misdrop_rate: float = 0.05
+
+# --- 技術と判断（§61 / §69） ------------------------------------------------
+
+## 高度テクニックを狙う度合い（要件定義 §69）。
+@export_range(0.0, 1.0, 0.01) var technique_usage: float = 0.3
+
+## Garbage のさばき方の上手さ（相殺の狙い方・掘るタイミング）。
+@export_range(0.0, 1.0, 0.01) var garbage_skill: float = 0.5
+
+## Target の選び方の上手さ。
+@export_range(0.0, 1.0, 0.01) var target_skill: float = 0.5
+
 # --- 評価の軸（§61） --------------------------------------------------------
 
 ## 穴を避ける度合い。穴の数と深さに掛かる。
