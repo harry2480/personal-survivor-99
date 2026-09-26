@@ -61,6 +61,26 @@ func test_place_count_does_not_depend_on_frame_rate() -> void:
 	)
 
 
+func test_pps_holds_when_the_interval_is_not_a_multiple_of_the_frame() -> void:
+	# 4 PPS（0.25 秒）は 30fps / 45fps のフレーム幅で割り切れない。
+	# 配置のたびに端数を捨てると、置く回数がフレームレートで減る。
+	profile.pieces_per_second = 4.0
+
+	for fps in [60.0, 45.0, 30.0]:
+		var timing := CpuTiming.new(profile)
+		assert_eq(_count_places(timing, 5.0, 1.0 / fps), 20, "%.0f fps でも 4 PPS × 5 秒で 20 回" % fps)
+
+
+func test_a_long_stall_does_not_cause_a_burst() -> void:
+	# 処理落ちで 1 秒止まっても、取り戻そうとまとめて置かない。
+	var timing := CpuTiming.new(profile)
+
+	assert_true(timing.update(1.0), "止まっていた間に 1 回ぶんは溜まる")
+	timing.notify_placed()
+
+	assert_false(timing.update(FRAME), "次のフレームですぐまた置かない")
+
+
 func test_zero_or_negative_pps_is_handled() -> void:
 	profile.pieces_per_second = 0.0
 	var timing := CpuTiming.new(profile)
