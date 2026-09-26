@@ -66,6 +66,7 @@ func test_parameters_change_monotonically() -> void:
 		for property in [
 			"placement_quality",
 			"lookahead",
+			"beam_width",
 			"technique_usage",
 			"garbage_skill",
 			"target_skill",
