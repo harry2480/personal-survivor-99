@@ -4,6 +4,15 @@ extends Node
 ## 要件定義 §107 Scene構成 / §109 Game State に対応する。
 ##
 ## Game Core（core/）はこの Node を参照しない。Scene 遷移は Presentation の責務とする。
+##
+## 状態の移り方は [constant ALLOWED_TRANSITIONS] で決まっている。通らない遷移は
+## 黙って捨てるのではなく、ログへ出して現状を保つ（要件定義 §109 / #51）。
+##
+## [codeblock]
+## BOOT → MAIN_MENU → LOADING → PLAYING ⇄ PAUSED
+##                                 ↓         ↓
+##                              FINISHED → RESULT → MAIN_MENU
+## [/codeblock]
 
 ## 状態が変わった直後に発火する。実際の Scene 切り替えはこの後フレーム終端で行われる。
 signal state_changed(previous: GameState.State, current: GameState.State)
@@ -12,20 +21,110 @@ signal state_changed(previous: GameState.State, current: GameState.State)
 ## Scene を切り替えず、現在の Scene の上で扱う。
 const SCENE_PATHS: Dictionary = {
 	GameState.State.MAIN_MENU: "res://scenes/main_menu/main_menu.tscn",
-	# Phase 1 の間は動作確認用の単体プレイ画面を使う。
-	# Battle Scene（scenes/battle/）へ戻すのは Phase 8（#48〜#50）。
-	GameState.State.PLAYING: "res://scenes/solo/solo_play.tscn",
+	GameState.State.PLAYING: "res://scenes/battle/battle.tscn",
 	GameState.State.RESULT: "res://scenes/result/result.tscn",
+}
+
+## 許される遷移（要件定義 §109）。
+##
+## Pause は Scene を切り替えず、PLAYING の上に重ねる。Restart は
+## LOADING を挟んで PLAYING へ戻る。
+const ALLOWED_TRANSITIONS: Dictionary = {
+	GameState.State.BOOT: [GameState.State.MAIN_MENU],
+	GameState.State.MAIN_MENU: [GameState.State.LOADING, GameState.State.PLAYING],
+	GameState.State.LOADING: [GameState.State.PLAYING, GameState.State.MAIN_MENU],
+	GameState.State.PLAYING:
+	[GameState.State.PAUSED, GameState.State.FINISHED, GameState.State.MAIN_MENU],
+	GameState.State.PAUSED:
+	[GameState.State.PLAYING, GameState.State.LOADING, GameState.State.MAIN_MENU],
+	GameState.State.FINISHED: [GameState.State.RESULT, GameState.State.MAIN_MENU],
+	GameState.State.RESULT: [GameState.State.MAIN_MENU, GameState.State.LOADING],
 }
 
 var current_state: GameState.State = GameState.State.BOOT
 
 var _current_scene_path: String = ""
+var _battle_setup: BattleSetup = BattleSetup.create_default()
+
+
+## その遷移が許されているかを返す（要件定義 §109）。
+func can_change_state(next_state: GameState.State) -> bool:
+	if next_state == current_state:
+		return true
+	return next_state in ALLOWED_TRANSITIONS.get(current_state, [])
+
+
+## 次の Battle の設定を返す（要件定義 §95）。
+func get_battle_setup() -> BattleSetup:
+	return _battle_setup
+
+
+## 次の Battle の設定を差し替える。
+func set_battle_setup(setup: BattleSetup) -> void:
+	if setup != null:
+		_battle_setup = setup
+
+
+## Battle を始める（Main Menu からの入口。要件定義 §95）。
+##
+## LOADING を挟んでから PLAYING へ移る。Seed はここで決まる。
+func start_battle(setup: BattleSetup = null) -> void:
+	set_battle_setup(setup)
+	_battle_setup.resolve_seed()
+	change_state(GameState.State.LOADING)
+	change_state(GameState.State.PLAYING)
+
+
+## 同じ設定で Battle をやり直す（要件定義 §96 の Restart）。
+##
+## Seed を引き直すので、同じ盤面の繰り返しにはならない。
+func restart_battle() -> void:
+	_battle_setup.clear_seed()
+	_battle_setup.resolve_seed()
+	change_state(GameState.State.LOADING)
+	_current_scene_path = ""
+	change_state(GameState.State.PLAYING)
+
+
+## Battle を中断して Main Menu へ戻る（要件定義 §96 の Quit to Menu）。
+func quit_to_menu() -> void:
+	_battle_setup.clear_seed()
+	change_state(GameState.State.MAIN_MENU)
+
+
+## Pause / Resume を切り替える（要件定義 §96）。
+##
+## Scene は切り替えない。Battle 画面がこの状態を見て止める。
+func set_battle_paused(paused: bool) -> void:
+	if paused and current_state == GameState.State.PLAYING:
+		change_state(GameState.State.PAUSED)
+	elif not paused and current_state == GameState.State.PAUSED:
+		change_state(GameState.State.PLAYING)
+
+
+## Battle の決着を伝える（要件定義 §109）。
+func finish_battle() -> void:
+	change_state(GameState.State.FINISHED)
+	change_state(GameState.State.RESULT)
 
 
 ## 状態を遷移させ、対応する Scene があれば切り替える。
+##
+## 許されていない遷移は行わない（要件定義 §109）。
 func change_state(next_state: GameState.State) -> void:
 	if next_state == current_state:
+		return
+
+	if not can_change_state(next_state):
+		push_warning(
+			(
+				"許されていない状態遷移です: %s -> %s"
+				% [
+					GameState.State.keys()[current_state],
+					GameState.State.keys()[next_state],
+				]
+			)
+		)
 		return
 
 	var previous: GameState.State = current_state
