@@ -10,6 +10,7 @@ CI では動かさない計測・検証用のスクリプト置き場。
 | `benchmark_cpu_scheduling.gd` | CPU 更新の分散の効き方を測る | `scripts/benchmark-cpu-scheduling.sh` |
 | `profile_battle.gd` | 99 人戦の 1 フレームの内訳を測る | `scripts/profile-battle.sh` |
 | `verify_determinism.gd` | 同じ Seed から同じ決着になるか確かめる | `scripts/verify-determinism.sh` |
+| `stress_battles.gd` | 連続試合でメモリが増えないか確かめる | `scripts/stress-battles.sh` |
 
 ## benchmark_cpu_search.gd
 
@@ -171,3 +172,13 @@ scripts/verify-determinism.sh    # 決着が変わっていないか確かめる
 
 計測結果・最適化の内容・GDExtension の導入判断は
 [docs/性能計測と最適化.md](../docs/性能計測と最適化.md) に記録している。
+
+## stress_battles.gd
+
+連続試合（既定 50 回）でメモリと Object 数が増え続けないことを確かめる（#56）。
+
+```sh
+scripts/stress-battles.sh
+```
+
+計測結果は [docs/性能計測と最適化.md](../docs/性能計測と最適化.md) の 7 節。
