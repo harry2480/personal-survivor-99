@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="BoardPalette" format=3]
+
+[ext_resource type="Script" path="res://ui/components/board_palette.gd" id="1_palette"]
+
+[resource]
+resource_name = "Board Palette"
+script = ExtResource("1_palette")
+piece_colors = PackedColorArray(0.239, 0.839, 0.961, 1, 0.247, 0.435, 0.847, 1, 0.961, 0.624, 0.239, 1, 0.961, 0.878, 0.239, 1, 0.31, 0.847, 0.396, 1, 0.706, 0.361, 0.941, 1, 0.941, 0.31, 0.361, 1)
+garbage_color = Color(0.478, 0.498, 0.549, 1)
+empty_color = Color(0.086, 0.102, 0.133, 1)
+grid_color = Color(0.137, 0.161, 0.212, 1)
+ghost_alpha = 0.35
+danger_colors = PackedColorArray(0, 0, 0, 0, 0.961, 0.878, 0.239, 0.5, 0.961, 0.624, 0.239, 0.75, 0.941, 0.31, 0.361, 1)
+incoming_color = Color(0.941, 0.31, 0.361, 1)
+incoming_background_color = Color(0.165, 0.184, 0.227, 1)

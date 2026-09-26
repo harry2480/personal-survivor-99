@@ -42,6 +42,11 @@ signal garbage_event_applied(source_player_id: int, line_count: int)
 ## Top Out した（Spawn できなかった）。
 signal topped_out
 
+## [method start] で盤面を初期化して始めた（再開を含む）。
+##
+## 盤面の表示は、この通知で読み直す。再開は Lock も Line Clear も起こさないため。
+signal started
+
 ## Attack 倍率（要件定義 §38 の後半 / §57）。0 未満は 0 にする。
 ##
 ## 倍率は相殺の前に掛ける。倍率の決め方は Battle Layer の責務で、ここには
@@ -110,6 +115,7 @@ func start(game_seed: int = 0) -> void:
 	_game_time_sec = 0.0
 	_is_over = false
 	_spawn_next()
+	started.emit()
 
 
 ## 時間を進める。
