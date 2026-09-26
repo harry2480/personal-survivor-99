@@ -124,22 +124,15 @@ func get_indicators(player_id: int) -> CpuIndicators:
 	return CpuIndicators.new()
 
 
-## 直前の [method update] で、防御で捌いた Garbage 行数を返す。
+## 前回取り出してから処理した Garbage 行数を返して 0 に戻す。
 ##
-## Lightweight だけが対象。Detailed は盤面の Garbage 処理（Battle Layer の
-## Garbage Router）が帰属を記録するので、ここでは 0 を返す。
-func get_last_cleared_garbage(player_id: int) -> int:
+## x が防御で捌いた行数、y が盤面へ積んだ行数。KO の帰属は y だけを対象にする。
+## Lightweight だけが対象。Detailed は盤面を持つので、ここでは (0, 0) を返す。
+func take_garbage_result(player_id: int) -> Vector2i:
 	if get_mode(player_id) == Mode.LIGHTWEIGHT and _lightweight.has(player_id):
-		return _lightweight[player_id].get_last_cleared_garbage()
-	return 0
-
-
-## 直前の [method update] で、盤面へ積んだ Garbage 行数を返す。対象は
-## [method get_last_cleared_garbage] と同じ。
-func get_last_applied_garbage(player_id: int) -> int:
-	if get_mode(player_id) == Mode.LIGHTWEIGHT and _lightweight.has(player_id):
-		return _lightweight[player_id].get_last_applied_garbage()
-	return 0
+		var cpu: LightweightCpu = _lightweight[player_id]
+		return Vector2i(cpu.take_cleared_garbage(), cpu.take_applied_garbage())
+	return Vector2i.ZERO
 
 
 ## Detailed 化すべき候補を、優先度の高い順に返す（要件定義 §81）。
@@ -240,6 +233,19 @@ func update(delta_sec: float) -> Dictionary:
 			attacks[player_id] = attack
 
 	return attacks
+
+
+## CPU 1 体だけ時間を進める（更新の分散。要件定義 §104）。
+##
+## 出した Attack 行数を返す。分散しても**渡した時間の合計は変わらない**ので、
+## Battle の時間整合性は保たれる（#47 の制約）。
+func update_player(player_id: int, delta_sec: float) -> int:
+	if get_mode(player_id) == Mode.DETAILED:
+		_detailed[player_id].update(delta_sec)
+		return 0
+	if _lightweight.has(player_id):
+		return _lightweight[player_id].update(delta_sec)
+	return 0
 
 
 ## Garbage を渡す。方式によらず同じ口で受ける（#42 の制約）。

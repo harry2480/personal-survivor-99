@@ -68,6 +68,7 @@ var _combat_eliminations: int = 0
 var _pending_garbage: Dictionary = {}
 var _on_eliminated: Callable
 var _human_connections: Array = []
+var _scheduler: CpuScheduler = null
 var _frame_count: int = 0
 var _frame_usec_total: int = 0
 var _frame_usec_max: int = 0
@@ -160,6 +161,10 @@ func assign_profiles(profiles: Array[CpuProfile]) -> void:
 		_strengths[player.player_id] = profiles[index].strength
 		index += 1
 
+	# 分散していれば、差し替えた Profile を基準値として取り直す。
+	if _scheduler != null:
+		_scheduler.sync_profiles()
+
 
 ## 決着まで進める。決着したら [code]true[/code]。
 ##
@@ -178,8 +183,14 @@ func run(
 		step(delta_sec)
 
 	if not _manager.is_finished():
-		_timed_out = true
-		_finish_by_standing()
+		# 分散の途中で終わると CPU ごとに進んだ時間がばらつくので、渡しきる。
+		if _scheduler != null:
+			_dispatch_attacks(_scheduler.flush())
+			_attribute_applied_garbage()
+			_eliminate_topped_out()
+		if not _manager.is_finished():
+			_timed_out = true
+			_finish_by_standing()
 	return _manager.is_finished()
 
 
@@ -199,7 +210,9 @@ func step(delta_sec: float, human_input: Callable = Callable()) -> void:
 	_elapsed_sec += maxf(0.0, delta_sec)
 	_manager.update(delta_sec)
 
-	var attacks: Dictionary = _cpus.update(delta_sec)
+	var attacks: Dictionary = (
+		_scheduler.update(delta_sec) if _scheduler != null else _cpus.update(delta_sec)
+	)
 	_attribute_applied_garbage()
 
 	# BattleManager.update() は盤面から危険度を計算し直す。Runner の盤面は動かないので、
@@ -207,13 +220,15 @@ func step(delta_sec: float, human_input: Callable = Callable()) -> void:
 	_sync_battle_state()
 	_targets.update_all_targets()
 
-	for source_id in attacks:
-		_send_attack(source_id, attacks[source_id])
+	_dispatch_attacks(attacks)
 
 	_sync_battle_state()
 	_eliminate_topped_out()
 
-	_record_frame_time(Time.get_ticks_usec() - started_usec)
+	var elapsed_usec: int = Time.get_ticks_usec() - started_usec
+	_record_frame_time(elapsed_usec)
+	if _scheduler != null:
+		_scheduler.observe_frame_time(float(elapsed_usec) / 1000.0)
 
 
 ## 進めたフレーム数を返す。
@@ -241,6 +256,19 @@ func get_estimated_fps() -> float:
 	if average_msec <= 0.0:
 		return 1000.0
 	return minf(1000.0, 1000.0 / average_msec)
+
+
+## CPU の更新を分散する（要件定義 §104 / #47）。
+##
+## 有効にすると、毎フレーム全体を動かす代わりに [CpuScheduler] が組に分けて回す。
+func enable_scheduling(policy: CpuSchedulePolicy = null) -> CpuScheduler:
+	_scheduler = CpuScheduler.new(_cpus, policy)
+	return _scheduler
+
+
+## 使っている [CpuScheduler] を返す。分散していなければ [code]null[/code]。
+func get_scheduler() -> CpuScheduler:
+	return _scheduler
 
 
 ## Detailed で動いている CPU の数を返す（要件定義 §81）。
@@ -351,6 +379,11 @@ func _record_frame_time(elapsed_usec: int) -> void:
 	_frame_usec_max = maxi(_frame_usec_max, elapsed_usec)
 
 
+func _dispatch_attacks(attacks: Dictionary) -> void:
+	for source_id in attacks:
+		_send_attack(source_id, attacks[source_id])
+
+
 func _send_attack(source_id: int, line_count: int) -> void:
 	if line_count <= 0:
 		return
@@ -370,6 +403,11 @@ func _send_attack(source_id: int, line_count: int) -> void:
 	if target.is_human():
 		# KO の帰属は、盤面へ実際に積まれた時点で記録する（_on_human_garbage_applied）。
 		target.session.receive_garbage_lines(sent, source_id)
+	elif _cpus.get_mode(target.player_id) == CpuManager.Mode.DETAILED:
+		# Detailed の盤面は送り手を知らずに Garbage を受ける（CpuManager.receive_garbage）ので、
+		# 積まれた時点を送り手ごとに追えない。送った時点で記録する。
+		_cpus.receive_garbage(target.player_id, sent)
+		_attribution.record_application(target.player_id, source_id, _elapsed_sec, sent)
 	else:
 		_cpus.receive_garbage(target.player_id, sent)
 		# KO の帰属は、盤面へ実際に積まれた時点で記録する（_attribute_applied_garbage）。
@@ -386,8 +424,22 @@ func _send_attack(source_id: int, line_count: int) -> void:
 func _attribute_applied_garbage() -> void:
 	for victim_id in _pending_garbage:
 		var queue: Array = _pending_garbage[victim_id]
-		_consume_garbage(queue, _cpus.get_last_cleared_garbage(victim_id), -1)
-		_consume_garbage(queue, _cpus.get_last_applied_garbage(victim_id), victim_id)
+		if _cpus.get_mode(victim_id) == CpuManager.Mode.DETAILED:
+			# Detailed へ昇格すると、受信待ちの Garbage は盤面へ移る（CpuManager の昇格処理）。
+			# 以後は積まれた行数が返らないので、残りはここで記録して列を空にする。
+			# 放っておくと、降格したときに古い送り手へ KO が付く。
+			_consume_garbage(queue, _count_lines(queue), victim_id)
+			continue
+		var result: Vector2i = _cpus.take_garbage_result(victim_id)
+		_consume_garbage(queue, result.x, -1)
+		_consume_garbage(queue, result.y, victim_id)
+
+
+func _count_lines(queue: Array) -> int:
+	var total: int = 0
+	for entry in queue:
+		total += entry[1]
+	return total
 
 
 # queue の先頭から line_count 行を取り除く。victim_id が 0 以上なら、取り除いた行を
