@@ -1,10 +1,14 @@
 class_name CpuBattleRunner
 extends RefCounted
 
-## CPU 同士の Battle を headless で回す（要件定義 §73〜§75 / §115）。
+## Battle を headless で回す（要件定義 §73〜§75 / §115 / §116）。
 ##
 ## Strength の配り方（[CpuDistribution]）が結果にどう出るかを見るための仕組み。
-## Survivor Scaling の確認（要件定義 §75）と CPU Benchmark（#45）が使う。
+## Survivor Scaling の確認（要件定義 §75）、CPU Benchmark（#45）、
+## Player 数のスケーリング検証（#46）が使う。
+##
+## [param human_count] を指定すると Human も混ぜられる（要件定義 §44）。Human の
+## 盤面は [PuzzleSession] そのままなので、呼び出し側が操作を与える。
 ##
 ## Simulation は **Lightweight 固定**（要件定義 §82）。盤面を持たずに指標だけを
 ## 進めるので、99 体でも現実的な時間で最後まで回せる。Detailed を混ぜた実戦の
@@ -63,13 +67,18 @@ var _combat_eliminations: int = 0
 # 受け手ごとの、まだ盤面へ積まれていない Garbage。[送り手 ID, 行数] を届いた順に並べる。
 var _pending_garbage: Dictionary = {}
 var _on_eliminated: Callable
+var _human_connections: Array = []
+var _frame_count: int = 0
+var _frame_usec_total: int = 0
+var _frame_usec_max: int = 0
 
 
 func _init(
 	cpu_count: int,
 	distribution: CpuDistribution = null,
 	mapping: CpuStrengthMapping = null,
-	battle_seed: int = 0
+	battle_seed: int = 0,
+	human_count: int = 0
 ) -> void:
 	var rules := GameRules.create_default()
 	# Lightweight の CPU は盤面を動かさない。放っておいた盤面が勝手に
@@ -78,7 +87,7 @@ func _init(
 	_balance = GameBalance.create_default()
 
 	_manager = BattleManager.new(rules, _balance)
-	_manager.setup(0, cpu_count, battle_seed)
+	_manager.setup(human_count, cpu_count, battle_seed)
 	_targets = TargetManager.new(_manager, battle_seed)
 	_ko = KoSystem.new(_manager, _attribution, _balance)
 	_cpus = CpuManager.new(_manager, battle_seed, 0)
@@ -87,6 +96,8 @@ func _init(
 	_manager.player_eliminated.connect(_on_eliminated)
 
 	_register_cpus(cpu_count, distribution, mapping, battle_seed)
+	_give_humans_normal_rules()
+	_connect_humans()
 	_targets.update_all_targets()
 
 
@@ -94,6 +105,10 @@ func _init(
 func dispose() -> void:
 	if _manager.player_eliminated.is_connected(_on_eliminated):
 		_manager.player_eliminated.disconnect(_on_eliminated)
+	for entry in _human_connections:
+		var session: PuzzleSession = entry[0]
+		session.disconnect(entry[1], entry[2])
+	_human_connections.clear()
 	_ko.dispose()
 
 
@@ -169,9 +184,17 @@ func run(
 
 
 ## 1 フレームぶん進める。
-func step(delta_sec: float) -> void:
+##
+## 1 フレームにかかった実時間も測る（#46 の完了条件）。
+## [param human_input] を渡すと、計測を始めてから最初に呼ぶ。Human の操作
+## （Hard Drop の Line Clear や Attack 計算）も同じフレームの負荷として測るため。
+func step(delta_sec: float, human_input: Callable = Callable()) -> void:
 	if _manager.is_finished():
 		return
+
+	var started_usec: int = Time.get_ticks_usec()
+	if human_input.is_valid():
+		human_input.call()
 
 	_elapsed_sec += maxf(0.0, delta_sec)
 	_manager.update(delta_sec)
@@ -189,6 +212,49 @@ func step(delta_sec: float) -> void:
 
 	_sync_battle_state()
 	_eliminate_topped_out()
+
+	_record_frame_time(Time.get_ticks_usec() - started_usec)
+
+
+## 進めたフレーム数を返す。
+func get_frame_count() -> int:
+	return _frame_count
+
+
+## 1 フレームの平均処理時間（ミリ秒）を返す。
+func get_average_frame_msec() -> float:
+	if _frame_count <= 0:
+		return 0.0
+	return float(_frame_usec_total) / float(_frame_count) / 1000.0
+
+
+## 1 フレームの最大処理時間（ミリ秒）を返す。
+func get_max_frame_msec() -> float:
+	return float(_frame_usec_max) / 1000.0
+
+
+## 平均処理時間から見込める FPS を返す（要件定義 §102 / §105）。
+##
+## 描画を含まない Simulation だけの値。上限は測定の意味がないので 1000 で止める。
+func get_estimated_fps() -> float:
+	var average_msec: float = get_average_frame_msec()
+	if average_msec <= 0.0:
+		return 1000.0
+	return minf(1000.0, 1000.0 / average_msec)
+
+
+## Detailed で動いている CPU の数を返す（要件定義 §81）。
+func get_detailed_count() -> int:
+	return _cpus.get_detailed_count()
+
+
+## Human の Player を返す（操作を与えるのは呼び出し側）。
+func get_human_players() -> Array[BattlePlayerState]:
+	var humans: Array[BattlePlayerState] = []
+	for player in _manager.get_players():
+		if player.is_human():
+			humans.append(player)
+	return humans
 
 
 ## 結果を順位の昇順で返す。
@@ -232,9 +298,57 @@ func _register_cpus(
 # 盤面を持たない CPU でも同じ形で見えるようにしておく。
 func _sync_battle_state() -> void:
 	for player in _manager.get_alive_players():
+		# Human は盤面を持っているので [BattleManager] の更新が正しい。
+		if player.is_human():
+			continue
 		var indicators: CpuIndicators = _cpus.get_indicators(player.player_id)
 		player.danger_level = indicators.danger_level
 		player.incoming_garbage = indicators.incoming_garbage
+
+
+# Human の盤面が出した Attack も同じ経路へ載せる（要件定義 §40）。
+# Human のセッションを、Gravity を止めていない通常のルールで作り直す。
+#
+# Lightweight の CPU のために Runner のルールは Gravity 0 にしてあるが、Human は
+# 実際の盤面で遊ぶので、通常どおりピースが落ちる必要がある。Seed は BattleManager と
+# 同じものを使うので、Piece 列は変わらない。
+func _give_humans_normal_rules() -> void:
+	var human_rules := GameRules.create_default()
+	for player in _manager.get_players():
+		if not player.is_human():
+			continue
+		var player_seed: int = _manager.get_player_seed(player.player_id)
+		var session := PuzzleSession.new(human_rules, PieceRandomizer.new(player_seed), _balance)
+		session.start(player_seed)
+		player.attach_session(session)
+
+
+func _connect_humans() -> void:
+	for player in _manager.get_players():
+		if not player.is_human() or player.session == null:
+			continue
+		var on_attack: Callable = _on_human_attack.bind(player.player_id)
+		player.session.attack_generated.connect(on_attack)
+		_human_connections.append([player.session, "attack_generated", on_attack])
+		var on_applied: Callable = _on_human_garbage_applied.bind(player.player_id)
+		player.session.garbage_event_applied.connect(on_applied)
+		_human_connections.append([player.session, "garbage_event_applied", on_applied])
+
+
+func _on_human_attack(amount: int, _context: AttackContext, source_id: int) -> void:
+	_send_attack(source_id, amount)
+
+
+# Human の盤面へ Garbage が実際に積まれたときに KO 帰属を記録する（要件定義 §56）。
+# 相殺で消えた行は積まれないので、ここには来ない。
+func _on_human_garbage_applied(source_id: int, line_count: int, victim_id: int) -> void:
+	_attribution.record_application(victim_id, source_id, _elapsed_sec, line_count)
+
+
+func _record_frame_time(elapsed_usec: int) -> void:
+	_frame_count += 1
+	_frame_usec_total += elapsed_usec
+	_frame_usec_max = maxi(_frame_usec_max, elapsed_usec)
 
 
 func _send_attack(source_id: int, line_count: int) -> void:
@@ -253,11 +367,15 @@ func _send_attack(source_id: int, line_count: int) -> void:
 	# 作り直さず、Battle が持っている倍率をそのまま掛ける。
 	var sent: int = MultiplierSystem.apply(line_count, source)
 
-	_cpus.receive_garbage(target.player_id, sent)
-	# KO の帰属は、盤面へ実際に積まれた時点で記録する（_attribute_applied_garbage）。
-	var queue: Array = _pending_garbage.get(target.player_id, [])
-	queue.append([source_id, sent])
-	_pending_garbage[target.player_id] = queue
+	if target.is_human():
+		# KO の帰属は、盤面へ実際に積まれた時点で記録する（_on_human_garbage_applied）。
+		target.session.receive_garbage_lines(sent, source_id)
+	else:
+		_cpus.receive_garbage(target.player_id, sent)
+		# KO の帰属は、盤面へ実際に積まれた時点で記録する（_attribute_applied_garbage）。
+		var queue: Array = _pending_garbage.get(target.player_id, [])
+		queue.append([source_id, sent])
+		_pending_garbage[target.player_id] = queue
 	_attack_sent[source_id] = _attack_sent.get(source_id, 0) + sent
 
 
@@ -292,6 +410,9 @@ func _eliminate_topped_out() -> void:
 		# 同時に Top Out しても、Battle が終わった後の脱落は成立しない（勝者は残る）。
 		if _manager.is_finished():
 			return
+		# Human は盤面を持っているので [BattleManager] が落とす。
+		if player.is_human():
+			continue
 		if not _cpus.is_over(player.player_id):
 			continue
 		_manager.eliminate_player(player.player_id)
@@ -322,7 +443,11 @@ func _find_worst_standing() -> int:
 		#
 		# Strength は見ない。Benchmark の結果が「強いほど上位」に寄るのは
 		# 戦った結果であるべきで、畳み方で作ってはいけない。
-		var indicators: CpuIndicators = _cpus.get_indicators(player.player_id)
+		var indicators: CpuIndicators = (
+			CpuIndicators.from_board(player.get_board())
+			if player.is_human()
+			else _cpus.get_indicators(player.player_id)
+		)
 		var score: int = indicators.stack_height * 100 + indicators.holes * 10
 		if worst_id < 0 or score > worst_score:
 			worst_id = player.player_id
@@ -333,4 +458,7 @@ func _find_worst_standing() -> int:
 
 func _record_elimination(player_id: int, rank: int) -> void:
 	_survival_sec[player_id] = _elapsed_sec
-	cpu_eliminated.emit(player_id, rank)
+	# CPU の脱落だけを知らせる。Human の脱落は BattleManager.player_eliminated で分かる。
+	var player: BattlePlayerState = _manager.get_player(player_id)
+	if player != null and not player.is_human():
+		cpu_eliminated.emit(player_id, rank)
