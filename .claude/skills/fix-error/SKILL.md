@@ -1,39 +1,46 @@
 ---
-description: エラーを修正する。エラーメッセージから原因を特定し、アーキテクチャルールに従って修正する
+description: エラーを直す。エラーメッセージから原因を特定し、アーキテクチャのルールに沿って修正する
 ---
 
 # エラー修正スキル
 
-ユーザーがエラーメッセージを貼り付けて「直して」と指示したときに適用する。
+## 1. まず再現する
 
-## 手順
+| 出どころ | 再現のしかた |
+|---|---|
+| 起動時・import 時 | `scripts/verify-godot.sh` |
+| テスト | `scripts/run-tests.sh`（1 本だけなら `-gselect=<ファイル名の一部>`） |
+| Lint / フォーマット | `scripts/static-check.sh` |
+| 実機プレイ中 | `/Applications/Godot.app/Contents/MacOS/Godot --path .` で再現手順をなぞる |
 
-1. **エラーメッセージを解析** — エラーの種類と発生箇所を特定
-2. **原因を特定** — コードを読んで根本原因を調査
-3. **修正を実施** — アーキテクチャルールに違反しない形で修正
-4. **検証** — `pnpm verify` で全チェックがパスすることを確認
+**Godot はスクリプトエラーが出ても終了コード 0 を返すことがある。**出力の
+`ERROR` / `SCRIPT ERROR` / `WARNING` を読む。
 
-## よくあるエラーと対処
+## 2. よくある原因
 
-### 型エラー（TypeScript）
-- `tsc --noEmit` で確認
-- 型の不一致を修正。`any` は使わない
+| 症状 | 見るところ |
+|---|---|
+| `Assigned value for constant ... isn't a constant expression` | `PackedFloat32Array(...)` などは `const` にできない。`static func` で返す |
+| `Trying to assign an array of type "Array" to ... Array[int]` | `duplicate()` は型なし配列を返す。`assign()` を使う |
+| `Parameter "obj" is null` | 解放済みの相手の signal を切ろうとしている。`is_instance_valid()` で守る |
+| `resources still in use at exit` | 購読の切り忘れ。lambda で `self` を捕まえると循環する（`dispose()` を用意する） |
+| 依存方向のエラー | Game Core が上位層を参照している。`scripts/static-check.sh` が検出する |
+| 結果が再現しない | グローバル乱数を使っている。Seed 付きの `RandomNumberGenerator` にする |
 
-### 依存方向違反（dependency-cruiser）
-- `pnpm depcruise` で確認
-- 依存方向: `presentation → application → domain ← infrastructure`
-- application から infrastructure を直接 import している場合 → Gateway interface 経由に修正
-- presentation/loaders,actions から domain,infrastructure を import している場合 → composition 経由に修正
+似た症状は `docs/` と過去の PR にも記録がある。
 
-### Prisma エラー
-- スキーマ変更後に `pnpm --filter webapp prisma generate` を忘れている場合が多い
-- マイグレーションが必要な場合は `pnpm db:migrate`
+## 3. 直す
 
-### lint エラー
-- `pnpm lint:fix` で自動修正
+- **対症療法にしない。**なぜその値・その状態になったのかまで辿る
+- 直したら**その不具合を捕まえるテストを足す**（同じ壊れ方を二度しないため）
+- 数値の調整で直す場合は `config/` のデータを変える。コードへ埋めない
 
-## ルール
+## 4. 確認
 
-- 修正時もアーキテクチャルール（依存方向、命名規約）を守る
-- 修正後は必ず `pnpm verify` を実行
-- エラーの根本原因を修正する（場当たり的な回避策は避ける）
+```sh
+scripts/static-check.sh
+scripts/verify-godot.sh
+scripts/run-tests.sh
+```
+
+直した内容と、**なぜそれで直るのか**を報告する。
