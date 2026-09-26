@@ -59,6 +59,9 @@ var _survival_sec: Dictionary = {}
 var _elapsed_sec: float = 0.0
 var _timed_out: bool = false
 var _combat_eliminations: int = 0
+
+# 受け手ごとの、まだ盤面へ積まれていない Garbage。[送り手 ID, 行数] を届いた順に並べる。
+var _pending_garbage: Dictionary = {}
 var _on_eliminated: Callable
 
 
@@ -158,9 +161,15 @@ func step(delta_sec: float) -> void:
 
 	_elapsed_sec += maxf(0.0, delta_sec)
 	_manager.update(delta_sec)
-	_targets.update_all_targets()
 
 	var attacks: Dictionary = _cpus.update(delta_sec)
+	_attribute_applied_garbage()
+
+	# BattleManager.update() は盤面から危険度を計算し直す。Runner の盤面は動かないので、
+	# Lightweight の指標を写してから Target を選ぶ（Danger / Counter が正しく効くように）。
+	_sync_battle_state()
+	_targets.update_all_targets()
+
 	for source_id in attacks:
 		_send_attack(source_id, attacks[source_id])
 
@@ -231,15 +240,49 @@ func _send_attack(source_id: int, line_count: int) -> void:
 	var sent: int = MultiplierSystem.apply(line_count, source)
 
 	_cpus.receive_garbage(target.player_id, sent)
-	_attribution.record_application(target.player_id, source_id, _elapsed_sec, sent)
+	# KO の帰属は、盤面へ実際に積まれた時点で記録する（_attribute_applied_garbage）。
+	var queue: Array = _pending_garbage.get(target.player_id, [])
+	queue.append([source_id, sent])
+	_pending_garbage[target.player_id] = queue
 	_attack_sent[source_id] = _attack_sent.get(source_id, 0) + sent
+
+
+# この更新で盤面へ積まれた Garbage だけを KO 帰属に記録する（要件定義 §56）。
+#
+# 防御で捌いた行は古い順に消し、残りを送り手ごとにまとめて記録する。
+# 送っただけで積まれていない Attack や、捌かれて消えた Attack には KO を付けない。
+func _attribute_applied_garbage() -> void:
+	for victim_id in _pending_garbage:
+		var queue: Array = _pending_garbage[victim_id]
+		_consume_garbage(queue, _cpus.get_last_cleared_garbage(victim_id), -1)
+		_consume_garbage(queue, _cpus.get_last_applied_garbage(victim_id), victim_id)
+
+
+# queue の先頭から line_count 行を取り除く。victim_id が 0 以上なら、取り除いた行を
+# 送り手ごとに KO 帰属へ記録する。
+func _consume_garbage(queue: Array, line_count: int, victim_id: int) -> void:
+	var remaining: int = line_count
+	while remaining > 0 and not queue.is_empty():
+		var entry: Array = queue[0]
+		var lines: int = mini(remaining, entry[1])
+		if victim_id >= 0:
+			_attribution.record_application(victim_id, entry[0], _elapsed_sec, lines)
+		entry[1] -= lines
+		remaining -= lines
+		if entry[1] <= 0:
+			queue.pop_front()
 
 
 func _eliminate_topped_out() -> void:
 	for player in _manager.get_alive_players():
-		if _cpus.is_over(player.player_id):
+		# 同時に Top Out しても、Battle が終わった後の脱落は成立しない（勝者は残る）。
+		if _manager.is_finished():
+			return
+		if not _cpus.is_over(player.player_id):
+			continue
+		_manager.eliminate_player(player.player_id)
+		if not player.alive:
 			_combat_eliminations += 1
-			_manager.eliminate_player(player.player_id)
 
 
 # 時間切れのときに、盤面が悪い順へ畳んで順位を確定させる。
@@ -248,6 +291,7 @@ func _eliminate_topped_out() -> void:
 # 区別せず直近の攻撃者に KO を付けるため、先に攻撃の履歴を消しておく。
 func _finish_by_standing() -> void:
 	_attribution.clear()
+	_pending_garbage.clear()
 	while _manager.get_alive_count() > 1:
 		var worst_id: int = _find_worst_standing()
 		if worst_id < 0:

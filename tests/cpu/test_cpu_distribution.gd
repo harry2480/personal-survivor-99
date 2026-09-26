@@ -10,6 +10,8 @@ const SEED: int = 20260921
 const CPU_COUNT: int = 12
 const BATTLE_LIMIT_SEC: float = 120.0
 
+const FRAME: float = 1.0 / 60.0
+
 ## 誰も Top Out しないうちに時間切れにするための上限（秒）。
 const SHORT_LIMIT_SEC: float = 10.0
 
@@ -363,6 +365,63 @@ func test_players_folded_at_the_time_limit_are_not_counted_as_kos() -> void:
 	assert_true(runner.is_timed_out(), "時間切れで畳んでいる")
 	assert_gt(sent, 0, "Attack は送られている")
 	assert_eq(kos, runner.get_combat_elimination_count(), "KO は実際に Top Out させたぶんだけ（畳んだぶんは数えない）")
+
+
+func test_targets_see_the_lightweight_danger() -> void:
+	# Runner の盤面は動かないので、BattleManager.update() が危険度を SAFE に戻す。
+	# Lightweight の指標を写してから選ばないと、KO モードが危険な CPU を狙えない。
+	var runner: CpuBattleRunner = _new_runner(_spread_distribution(), 4)
+	var players: Array[BattlePlayerState] = runner.get_manager().get_players()
+	var victim_id: int = players[players.size() - 1].player_id
+	var indicators: CpuIndicators = runner.get_cpu_manager().get_indicators(victim_id)
+	indicators.stack_height = Board.VISIBLE_HEIGHT - 2
+	indicators.danger_level = DangerLevel.Level.CRITICAL
+	for player in players:
+		player.target_mode = TargetMode.Mode.KO
+
+	runner.step(FRAME)
+
+	for player in players:
+		if player.player_id != victim_id:
+			assert_eq(player.current_target, victim_id, "Player %d は危険な CPU を狙う" % player.player_id)
+
+
+func test_only_garbage_that_lands_is_attributed() -> void:
+	# 防御で捌かれた Attack には KO を付けない。積まれた Attack だけを記録する。
+	for defended in [true, false]:
+		var runner: CpuBattleRunner = _new_runner(_spread_distribution(), 3)
+		var players: Array[BattlePlayerState] = runner.get_manager().get_players()
+		var source: BattlePlayerState = players[0]
+		var victim_id: int = players[1].player_id
+		var victim: CpuIndicators = runner.get_cpu_manager().get_indicators(victim_id)
+		victim.defense_rate = 100.0 if defended else 0.0
+		source.current_target = victim_id
+
+		runner._send_attack(source.player_id, 3)
+		var history_before: int = runner._attribution.get_history(victim_id).size()
+		for _frame in range(int(LightweightCpu.UPDATE_INTERVAL_SEC / FRAME) + 1):
+			runner.step(FRAME)
+
+		assert_eq(history_before, 0, "送っただけでは記録しない")
+		var from_source: int = 0
+		for application in runner._attribution.get_history(victim_id):
+			if application.source_player_id == source.player_id:
+				from_source += application.line_count
+		assert_eq(from_source, 0 if defended else 3, "捌かれたら 0 行、積まれたら 3 行")
+
+
+func test_simultaneous_top_out_counts_only_real_eliminations() -> void:
+	# 最後の 2 体が同時に Top Out しても、脱落が成立するのは 1 体（勝者は残る）。
+	var runner: CpuBattleRunner = _new_runner(_spread_distribution(), 2)
+	for player in runner.get_manager().get_players():
+		runner.get_cpu_manager().get_indicators(player.player_id).stack_height = (
+			Board.VISIBLE_HEIGHT
+		)
+
+	runner.step(FRAME)
+
+	assert_true(runner.get_manager().is_finished(), "決着している")
+	assert_eq(runner.get_combat_elimination_count(), 1, "数えるのは成立した脱落だけ")
 
 
 func test_battle_is_reproducible() -> void:

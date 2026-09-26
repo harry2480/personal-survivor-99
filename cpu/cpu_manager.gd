@@ -124,6 +124,24 @@ func get_indicators(player_id: int) -> CpuIndicators:
 	return CpuIndicators.new()
 
 
+## 直前の [method update] で、防御で捌いた Garbage 行数を返す。
+##
+## Lightweight だけが対象。Detailed は盤面の Garbage 処理（Battle Layer の
+## Garbage Router）が帰属を記録するので、ここでは 0 を返す。
+func get_last_cleared_garbage(player_id: int) -> int:
+	if get_mode(player_id) == Mode.LIGHTWEIGHT and _lightweight.has(player_id):
+		return _lightweight[player_id].get_last_cleared_garbage()
+	return 0
+
+
+## 直前の [method update] で、盤面へ積んだ Garbage 行数を返す。対象は
+## [method get_last_cleared_garbage] と同じ。
+func get_last_applied_garbage(player_id: int) -> int:
+	if get_mode(player_id) == Mode.LIGHTWEIGHT and _lightweight.has(player_id):
+		return _lightweight[player_id].get_last_applied_garbage()
+	return 0
+
+
 ## Detailed 化すべき候補を、優先度の高い順に返す（要件定義 §81）。
 ##
 ## 候補は「Human の Target」「Human を Target 中」「UI 注目対象」「危険な CPU」
