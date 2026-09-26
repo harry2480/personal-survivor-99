@@ -25,6 +25,7 @@ var _session: PuzzleSession
 var _input: InputManager
 var _status_label: Label
 var _board_panel: PlayerBoardPanel
+var _player: BattlePlayerState
 var _state: ScreenState = ScreenState.PLAYING
 
 
@@ -50,8 +51,12 @@ func _ready() -> void:
 	var palette: Resource = load(PALETTE_PATH)
 	if palette is BoardPalette:
 		_board_panel.set_palette(palette)
-	# Battle がいないので Danger は盤面から求める（Board View 側の分岐）。
-	_board_panel.bind(_session, null)
+	# Danger の判定は Battle Layer が持つ（要件定義 §92）。Battle がいない単体プレイでも
+	# BattlePlayerState に判定させ、Board View にはその値を渡す。
+	_player = BattlePlayerState.create(0, PlayerType.Type.LOCAL_HUMAN)
+	_player.attach_session(_session)
+	_refresh_player_state()
+	_board_panel.bind(_session, _player)
 
 	_status_label = Label.new()
 	_status_label.position = (
@@ -66,6 +71,13 @@ func _process(delta: float) -> void:
 	if _state != ScreenState.PLAYING:
 		return
 	_session.update(delta)
+	_refresh_player_state()
+
+
+# Danger と Incoming を Battle Layer の判定で更新する。
+func _refresh_player_state() -> void:
+	_player.refresh_danger_level()
+	_player.refresh_incoming_garbage()
 
 
 # --- 入力 ------------------------------------------------------------------
