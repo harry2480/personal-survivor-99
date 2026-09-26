@@ -25,6 +25,9 @@ const MACHINE_RUN_SEC: float = 2.0
 const REPRODUCIBILITY_RUN_SEC: float = 3.0
 const QUALITY_PIECES: int = 40
 
+## scripts/coverage.sh が立てる環境変数。立っていれば CPU を走らせる比較を飛ばす。
+const COVERAGE_ENV: String = "PROJECT99_COVERAGE"
+
 var mapping: CpuStrengthMapping
 
 # Preset ごとの走行結果。同じ Seed なら結果は同じなので、走らせ直さない。
@@ -226,6 +229,19 @@ func _place_and_count_holes(profile: CpuProfile, piece_count: int) -> int:
 	return _count_holes(session.get_board())
 
 
+## カバレッジ計測中なら保留にして [code]true[/code] を返す。
+##
+## CPU を実際に走らせる比較は 1 手ごとに配置探索を回すので、行ごとに記録する
+## カバレッジ計測では 7 倍ほど遅くなり、計測全体の半分を占める。確かめたいのは
+## 「強さの差が出るか」で、どの行を通るかは他のテストで足りている。
+## 合否ゲートの scripts/run-tests.sh では環境変数が立たないので、毎回走る。
+func _skip_during_coverage() -> bool:
+	if OS.get_environment(COVERAGE_ENV) != "1":
+		return false
+	pending("カバレッジ計測中は CPU を走らせる比較を飛ばす（scripts/run-tests.sh では走る）")
+	return true
+
+
 func _count_holes(board: Board) -> int:
 	var metrics := BoardMetrics.new()
 	metrics.measure(board)
@@ -233,6 +249,8 @@ func _count_holes(board: Board) -> int:
 
 
 func test_extreme_places_more_pieces_than_a_normal_cpu() -> void:
+	if _skip_during_coverage():
+		return
 	var extreme: SoloRun = _preset_run(CpuPreset.Preset.EXTREME)
 	var normal: SoloRun = _preset_run(CpuPreset.Preset.NORMAL)
 
@@ -242,6 +260,8 @@ func test_extreme_places_more_pieces_than_a_normal_cpu() -> void:
 
 
 func test_extreme_stacks_more_cleanly_than_a_normal_cpu() -> void:
+	if _skip_during_coverage():
+		return
 	# PPS を外し、同じ手数で比べる。置き方の質そのものの比較。
 	var extreme_holes: int = _place_and_count_holes(
 		CpuPreset.create_profile(CpuPreset.Preset.EXTREME, mapping), QUALITY_PIECES
@@ -254,6 +274,8 @@ func test_extreme_stacks_more_cleanly_than_a_normal_cpu() -> void:
 
 
 func test_extreme_beats_every_standard_difficulty() -> void:
+	if _skip_during_coverage():
+		return
 	# 標準難易度（Strength 100 未満）のすべてに対して、同じ時間・同じ Seed で
 	# 「多く置き・多く消し・盤面が荒れない」ことを見る（MVP 受入条件 25）。
 	var extreme: SoloRun = _preset_run(CpuPreset.Preset.EXTREME)
@@ -274,6 +296,8 @@ func test_extreme_beats_every_standard_difficulty() -> void:
 
 
 func test_machine_outperforms_extreme() -> void:
+	if _skip_during_coverage():
+		return
 	var machine: SoloRun = _run_solo(
 		CpuPreset.create_profile(CpuPreset.Preset.MACHINE, mapping), MACHINE_RUN_SEC
 	)
@@ -287,6 +311,8 @@ func test_machine_outperforms_extreme() -> void:
 
 
 func test_runs_are_reproducible() -> void:
+	if _skip_during_coverage():
+		return
 	var profile: CpuProfile = CpuPreset.create_profile(CpuPreset.Preset.EXTREME, mapping)
 
 	var first: SoloRun = _run_solo(profile, REPRODUCIBILITY_RUN_SEC)
