@@ -21,6 +21,8 @@ scripts/verify-godot.sh         # import + 起動検証（CI と同じ）
 scripts/run-tests.sh            # GUT の自動テストを headless 実行
 scripts/coverage.sh             # カバレッジ計測（LCOV。gd-tools が必要）
 scripts/export-macos.sh         # macOS Export Validation（Export Templates が必要）
+scripts/benchmark-cpu.sh        # CPU の配置探索の計測（CI では動かさない）
+scripts/benchmark-cpu-strength.sh  # Strength ごとの CPU の強さの計測（CI では動かさない）
 scripts/setup-loop-labels.sh   # Loop 用ラベルの作成・更新
 scripts/loop-once.sh           # Loopを1回だけ実行
 scripts/loop.sh                # 最大5回までLoopを反復（LOOP_MAX_ITERATIONSで調整）

@@ -37,6 +37,11 @@ extends Resource
 ## Strength はそのままに人間の限界の扱いだけが変わる。
 @export var preset: CpuPreset.Preset = CpuPreset.Preset.CUSTOM
 
+## 全 CPU の [CpuProfile] に上書きする値（Advanced Settings。要件定義 §77 / §78）。
+##
+## key は [constant CpuSettings.ADVANCED_KEYS] のいずれか。空なら上書きしない。
+@export var profile_overrides: Dictionary = {}
+
 
 ## 既定の分布を作る（要件定義 §73 の例）。
 static func create_default() -> CpuDistribution:
@@ -86,7 +91,9 @@ func create_profiles(
 	)
 	var profiles: Array[CpuProfile] = []
 	for strength in generate(count, distribution_seed):
-		profiles.append(CpuPreset.create_profile_at(preset, strength, table))
+		var profile: CpuProfile = CpuPreset.create_profile_at(preset, strength, table)
+		CpuSettings.apply_overrides(profile, profile_overrides)
+		profiles.append(profile)
 	return profiles
 
 

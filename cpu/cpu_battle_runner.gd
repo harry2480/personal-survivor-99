@@ -132,6 +132,20 @@ func get_strength(player_id: int) -> float:
 	return _strengths.get(player_id, 0.0)
 
 
+## CPU へ [CpuProfile] を 1 体ずつ割り当て直す（Benchmark 用。要件定義 §115）。
+##
+## 分布ではなく「この Strength をこの席に」と決めたいときに使う。
+## Battle を進める前に呼ぶこと。
+func assign_profiles(profiles: Array[CpuProfile]) -> void:
+	var index: int = 0
+	for player in _manager.get_players():
+		if player.player_type != PlayerType.Type.CPU or index >= profiles.size():
+			continue
+		_cpus.register(player.player_id, profiles[index])
+		_strengths[player.player_id] = profiles[index].strength
+		index += 1
+
+
 ## 決着まで進める。決着したら [code]true[/code]。
 ##
 ## [param time_limit_sec] を超えたら、盤面が悪い順に畳んで順位を確定させる。

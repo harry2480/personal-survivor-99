@@ -5,6 +5,7 @@ CI では動かさない計測・検証用のスクリプト置き場。
 | ファイル | 内容 | 実行 |
 |---|---|---|
 | `benchmark_cpu_search.gd` | CPU の配置探索にかかる時間を測る | `scripts/benchmark-cpu.sh` |
+| `benchmark_cpu_strength.gd` | Strength ごとの CPU の強さを測る | `scripts/benchmark-cpu-strength.sh` |
 
 ## benchmark_cpu_search.gd
 
@@ -35,3 +36,52 @@ CPU は Piece ごとにしか考えないので実効的な負荷はもっと低
 
 探索やコリジョンの実装を変えたら測り直し、この表と
 `PlacementSearch.MAX_SEARCH_DEPTH` のコメントを更新する。
+
+## benchmark_cpu_strength.gd
+
+Strength Mapping（要件定義 §78）が素直に効いているかを数字で確かめる計測（#45 の完了条件）。
+
+CPU 同士を戦わせ、Strength ごとの**勝率・平均 Rank・平均 Attack・平均生存時間**を出す。
+1 試合につき、測る Strength を 1 体ずつ並べる。Seed を固定してあるので結果は再現する。
+
+席（Player ID）は試合ごとに 1 つずつずらす。時間切れで畳むときや Target の同点処理は
+Player ID の順に決まるので、席を固定すると結果が席に寄る。試合数は Strength の数の倍数にする。
+
+```sh
+scripts/benchmark-cpu-strength.sh
+```
+
+Simulation は Lightweight（要件定義 §82）。盤面を持たずに指標だけを進めるため、
+「探索の質」ではなく **Strength から決まる PPS・Garbage 処理・Attack 量の差**を見ることになる。
+探索そのものの速さは `benchmark_cpu_search.gd` の担当。
+
+### 計測結果（2026-09-26 / Seed 20260922 / 28 試合）
+
+各 Strength を 1 体ずつ並べた 7 人戦。席は試合ごとにずらしている。計測時間は約 6 秒。
+
+| Strength | 勝率 | 平均 Rank | 平均 Attack | 平均生存 (秒) |
+|---|---|---|---|---|
+| 10 | 0% | 5.68 | 0.0 | 11.7 |
+| 30 | 0% | 4.89 | 1.0 | 13.2 |
+| 50 | 0% | 5.43 | 3.5 | 12.7 |
+| 70 | 0% | 4.54 | 7.2 | 14.7 |
+| 85 | 0% | 4.00 | 12.9 | 15.7 |
+| 100 | 0% | 2.46 | 21.5 | 17.6 |
+| 150 | **100%** | 1.00 | 148.8 | 18.2 |
+
+Attack 量は Strength の順に並ぶ。平均 Rank も 70 以上は順に並ぶが、**30 と 50 が逆転している**。
+Machine 相当（150）の Attack が桁違いで 20 秒足らずで決着するため、下位の順位は
+「150 に狙われたか」で決まりやすい。Strength Mapping を見直すときの確認事項として残す。
+
+以前（2026-09-22）の表は席を固定して測っており、平均 Rank がきれいに並んでいたのは
+席の偏りによるところがあった。
+
+### 見るところ
+
+平均 Rank が Strength の順に並んでいれば、Strength を上げたぶんだけ強くなっている。
+並びが崩れていたら `config/cpu_strength_mapping.tres` のカーブを見直す。
+
+### CI では動かさない
+
+試合を最後まで回すため実行時間が長い。通常の CI の必須 check には含めず、
+Strength Mapping を調整したときに手で実行する（#45 の制約）。
