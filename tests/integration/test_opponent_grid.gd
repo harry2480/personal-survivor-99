@@ -137,6 +137,31 @@ func test_clicking_a_tile_reports_the_player_id() -> void:
 	assert_eq(selected, [grid.get_tiles()[3].player_id] as Array[int], "押した面の相手を伝える")
 
 
+func test_only_the_left_button_selects() -> void:
+	# 右・中クリックやホイールも pressed で届く。選ぶのは左クリックだけ。
+	var selected: Array[int] = []
+	grid.opponent_selected.connect(func(player_id: int) -> void: selected.append(player_id))
+
+	for button in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_WHEEL_UP]:
+		var event := InputEventMouseButton.new()
+		event.button_index = button
+		event.pressed = true
+		event.position = _tile_position(3)
+		grid._gui_input(event)
+
+	assert_eq(selected.size(), 0, "左クリック以外では選ばない")
+
+
+func test_the_margin_between_tiles_selects_nobody() -> void:
+	# 1 枚目のタイルの右の余白と下の余白は、隣のタイルとして扱わない。
+	var right_margin := Vector2(OpponentGrid.TILE_SIZE.x + OpponentGrid.TILE_MARGIN / 2.0, 1.0)
+	var bottom_margin := Vector2(1.0, OpponentGrid.TILE_SIZE.y + OpponentGrid.TILE_MARGIN / 2.0)
+
+	assert_eq(grid.get_player_id_at(right_margin), -1, "右の余白は選ばない")
+	assert_eq(grid.get_player_id_at(bottom_margin), -1, "下の余白は選ばない")
+	assert_ne(grid.get_player_id_at(_tile_position(1)), -1, "隣のタイルそのものは選べる")
+
+
 func test_position_outside_the_grid_selects_nobody() -> void:
 	assert_eq(grid.get_player_id_at(Vector2(-10.0, -10.0)), -1, "枠の外は選ばない")
 	assert_eq(grid.get_player_id_at(Vector2(0.0, 10000.0)), -1, "面が無いところは選ばない")

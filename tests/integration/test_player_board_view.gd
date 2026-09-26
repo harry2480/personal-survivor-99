@@ -178,8 +178,8 @@ func test_ui_does_not_judge_danger_by_itself() -> void:
 	assert_eq(view.get_danger_level(), DangerLevel.Level.SAFE, "UI 側で Danger を判定しない")
 
 
-func test_solo_play_falls_back_to_the_board() -> void:
-	# Battle がいない単体プレイでは Game Core から求める（Phase 1 の画面）。
+func test_view_does_not_judge_danger_without_the_battle_layer() -> void:
+	# Battle Layer の状態を渡されていなければ、盤面が埋まっていても UI は判定しない（§92）。
 	panel.bind(session, null)
 	for y in range(Board.VISIBLE_TOP_Y, Board.TOTAL_HEIGHT):
 		for x in range(Board.WIDTH - 1):
@@ -187,7 +187,7 @@ func test_solo_play_falls_back_to_the_board() -> void:
 
 	view.refresh()
 
-	assert_eq(view.get_danger_level(), DangerLevel.Level.CRITICAL, "盤面から求める")
+	assert_eq(view.get_danger_level(), DangerLevel.Level.SAFE, "UI は盤面から判定しない")
 
 
 # --- Hold / NEXT（要件定義 §88 / §90） --------------------------------------

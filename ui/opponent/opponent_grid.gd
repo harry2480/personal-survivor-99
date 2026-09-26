@@ -81,7 +81,10 @@ func _process(delta: float) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
-	if not (event is InputEventMouseButton and event.pressed):
+	# 選ぶのは左クリックだけ。右・中クリックやホイールも pressed で届くため弾く。
+	if not (
+		event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT
+	):
 		return
 	var player_id: int = get_player_id_at(event.position)
 	if player_id >= 0:
@@ -142,6 +145,11 @@ func get_player_id_at(position: Vector2) -> int:
 	var column: int = int(position.x / (TILE_SIZE.x + TILE_MARGIN))
 	var row: int = int(position.y / (TILE_SIZE.y + TILE_MARGIN))
 	if column >= COLUMNS:
+		return -1
+	# タイルの間の余白は、どのタイルでもない（隣のタイルを選ばない）。
+	var local_x: float = position.x - float(column) * (TILE_SIZE.x + TILE_MARGIN)
+	var local_y: float = position.y - float(row) * (TILE_SIZE.y + TILE_MARGIN)
+	if local_x >= TILE_SIZE.x or local_y >= TILE_SIZE.y:
 		return -1
 
 	var index: int = row * COLUMNS + column

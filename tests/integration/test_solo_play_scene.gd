@@ -59,3 +59,23 @@ func test_topped_out_screen_cannot_be_resumed_by_pause() -> void:
 	scene._on_command_pressed(GameCommand.Command.PAUSE)
 
 	assert_eq(scene._state, scene.ScreenState.TOPPED_OUT, "TOP OUT のまま維持される")
+
+
+func test_solo_play_shows_the_danger_judged_by_the_battle_layer() -> void:
+	# 単体プレイでも Danger は Battle Layer（BattlePlayerState）が判定し、画面はそれを渡す（§92）。
+	var scene: Node = SOLO_PLAY.instantiate()
+	add_child_autofree(scene)
+	await wait_frames(2)
+
+	var board: Board = scene._session.get_board()
+	for y in range(Board.VISIBLE_TOP_Y, Board.TOTAL_HEIGHT):
+		for x in range(Board.WIDTH - 1):
+			board.set_cell(x, y, Piece.Type.I)
+	await wait_frames(2)
+
+	assert_eq(scene._player.danger_level, DangerLevel.Level.CRITICAL, "Battle Layer が判定する")
+	assert_eq(
+		scene._board_panel.get_board_view().get_danger_level(),
+		DangerLevel.Level.CRITICAL,
+		"画面は Battle Layer の判定を映す"
+	)
