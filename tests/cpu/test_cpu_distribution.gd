@@ -233,6 +233,18 @@ func test_cpu_strength_never_changes_during_a_battle() -> void:
 # --- Survivor Scaling（要件定義 §75） ---------------------------------------
 
 
+func test_cpus_cannot_dig_faster_than_they_are_attacked() -> void:
+	# 同じ強さの相手から受ける Attack より速く掘れると、誰も脱落しない（#44）。
+	for strength in [30.0, 50.0, 70.0, 90.0, 110.0]:
+		var profile: CpuProfile = mapping.create_profile(strength)
+		var dig_rate: float = CpuIndicators.estimate_skill(profile) * profile.dig_rate_factor
+		assert_lt(
+			dig_rate,
+			CpuIndicators.estimate_attack_rate(profile),
+			"Strength %.0f: 掘る速さが受ける Attack を下回る" % strength
+		)
+
+
 func test_battle_finishes_and_ranks_everyone() -> void:
 	var runner: CpuBattleRunner = _new_runner(_spread_distribution())
 
