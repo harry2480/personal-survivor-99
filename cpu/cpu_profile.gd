@@ -72,6 +72,14 @@ extends Resource
 ## 危険な盤面から立て直す度合い。高さと危険度に掛かる。
 @export_range(0.0, 3.0, 0.05, "or_greater") var recovery_ability: float = 1.0
 
+# --- Lightweight の見積もり（§82） ------------------------------------------
+
+## 1 秒あたりの Attack 行数の見積もりに掛ける係数（PPS × 腕前 × この値）。
+@export_range(0.0, 2.0, 0.01, "or_greater") var attack_rate_factor: float = 0.25
+
+## 1 秒あたりに捌ける Garbage 行数の見積もりに掛ける係数（PPS × Garbage Skill × この値）。
+@export_range(0.0, 2.0, 0.01, "or_greater") var defense_rate_factor: float = 0.5
+
 # --- 個別の重み（§68） ------------------------------------------------------
 # 符号は「評価値に足す向き」。悪い指標は負の重みにする。
 
