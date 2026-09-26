@@ -133,6 +133,44 @@ func test_closing_advanced_falls_back_to_the_strength_only_profile() -> void:
 	assert_gt(profile.pieces_per_second, 0.0, "閉じれば Strength からの値に戻る")
 
 
+func test_advanced_shows_the_values_of_the_chosen_strength() -> void:
+	# 上書きしていない項目は、いま効いている値（Strength から決まる値）を出す。
+	_select_preset(CpuPreset.Preset.CUSTOM)
+	panel.set_strength_value(100.0)
+	panel.set_advanced_open(true)
+
+	var expected: CpuProfile = CpuPreset.create_profile_at(CpuPreset.Preset.CUSTOM, 100.0)
+	assert_almost_eq(
+		panel.get_advanced_value("pieces_per_second"),
+		expected.pieces_per_second,
+		0.05,
+		"PPS は Strength 100 の値"
+	)
+	assert_eq(panel.get_advanced_value("beam_width"), float(expected.beam_width), "Beam Width も同じ")
+
+	panel.set_advanced_value("misdrop_rate", 0.5)
+	panel.set_strength_value(30.0)
+	assert_eq(panel.get_advanced_value("misdrop_rate"), 0.5, "上書きした項目は Strength を変えても残る")
+
+
+func test_advanced_overrides_reach_every_cpu_in_the_battle() -> void:
+	# Battle は build_distribution() の分布から全 CPU を作る。個別調整がそこまで届くこと。
+	_select_preset(CpuPreset.Preset.CUSTOM)
+	panel.set_advanced_open(true)
+	panel.set_advanced_value("misdrop_rate", 0.0)
+	panel.set_advanced_value("beam_width", 20.0)
+
+	var profiles: Array[CpuProfile] = panel.get_settings().build_distribution().create_profiles(5)
+
+	for profile in profiles:
+		assert_eq(profile.misdrop_rate, 0.0, "Strength %.0f の CPU にも上書きが届く" % profile.strength)
+		assert_eq(profile.beam_width, 20, "Beam Width も届く")
+
+	panel.set_advanced_open(false)
+	var closed: CpuDistribution = panel.get_settings().build_distribution()
+	assert_true(closed.profile_overrides.is_empty(), "Advanced を閉じれば分布へ渡さない")
+
+
 # --- 標準最高難易度を超える設定（MVP 受入条件 24） --------------------------
 
 

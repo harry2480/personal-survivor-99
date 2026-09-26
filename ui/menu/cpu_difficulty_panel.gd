@@ -149,6 +149,13 @@ func set_advanced_value(key: String, value: float) -> bool:
 	return true
 
 
+## Advanced の入力欄に出ている値を返す。知らない key なら 0。
+func get_advanced_value(key: String) -> float:
+	if not _advanced_spins.has(key):
+		return 0.0
+	return _advanced_spins[key].value
+
+
 ## Custom の入力欄（Strength / Min / Max / Variation）が出ているかを返す。
 func is_custom_section_visible() -> bool:
 	return _custom_box != null and _custom_box.visible
@@ -191,10 +198,8 @@ func _build_custom_controls() -> void:
 
 
 func _build_advanced_controls() -> void:
-	var reference := CpuProfile.create_default()
 	for key in CpuSettings.ADVANCED_KEYS:
 		var spin: SpinBox = _new_spin(0.0, _advanced_maximum(key), _advanced_step(key))
-		spin.value = float(reference.get(key))
 		spin.value_changed.connect(_on_advanced_changed.bind(key))
 		_advanced_spins[key] = spin
 		_advanced_box.add_child(_labeled(key, spin))
@@ -234,11 +239,23 @@ func _apply_settings_to_controls() -> void:
 
 	_advanced_toggle.button_pressed = _settings.advanced_enabled
 	_advanced_box.visible = _settings.advanced_enabled
-	for key in _advanced_spins:
-		if _settings.advanced_overrides.has(key):
-			_advanced_spins[key].value = float(_settings.advanced_overrides[key])
+	_refresh_advanced_values()
 
 	_updating = false
+
+
+# Advanced の入力欄に、いま効いている値を出す。
+#
+# 上書きしていない項目は、選んだ Preset / Strength から決まる値を出す。
+# CpuProfile の既定値を出すと、実際に使われる値と食い違うため。
+func _refresh_advanced_values() -> void:
+	var was_updating: bool = _updating
+	_updating = true
+	var base: CpuProfile = CpuPreset.create_profile_at(_settings.preset, _settings.strength)
+	for key in _advanced_spins:
+		var value: Variant = _settings.advanced_overrides.get(key, base.get(key))
+		_advanced_spins[key].value = float(value)
+	_updating = was_updating
 
 
 func _is_custom_selected() -> bool:
@@ -262,6 +279,7 @@ func _on_strength_changed(value: float) -> void:
 		return
 	_settings.set_strength(value)
 	_strength_label.text = "%.0f" % _settings.strength
+	_refresh_advanced_values()
 	_notify_changed()
 
 

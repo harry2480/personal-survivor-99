@@ -72,12 +72,16 @@ func test_different_seed_changes_the_result() -> void:
 	var first: Array[CpuBenchmark.StrengthResult] = _sweep()
 	var second: Array[CpuBenchmark.StrengthResult] = _sweep(SEED + 1)
 
+	# 順位は Strength の順にそろいやすい（強さがそのまま順位に出るのは正しい）。
+	# Seed が効いていることは、試合の中身（Attack 量・生存時間）で見る。
 	var differs: bool = false
 	for index in range(first.size()):
-		if first[index].rank_total != second[index].rank_total:
+		if first[index].attack_total != second[index].attack_total:
+			differs = true
+		if not is_equal_approx(first[index].survival_total, second[index].survival_total):
 			differs = true
 
-	assert_true(differs, "Seed が違えば結果も変わる")
+	assert_true(differs, "Seed が違えば試合の中身も変わる")
 
 
 func test_report_is_a_table() -> void:

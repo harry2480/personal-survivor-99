@@ -84,27 +84,33 @@ func clear_advanced_overrides() -> void:
 ## Preset と Strength で作ってから、Advanced の上書きを当てる。
 func build_profile(mapping: CpuStrengthMapping = null) -> CpuProfile:
 	var profile: CpuProfile = CpuPreset.create_profile_at(preset, strength, mapping)
-	if not advanced_enabled:
-		return profile
-
-	for key in advanced_overrides:
-		if key in ADVANCED_KEYS:
-			profile.set(key, advanced_overrides[key])
+	if advanced_enabled:
+		apply_overrides(profile, advanced_overrides)
 	return profile
 
 
 ## この設定から CPU 群の [CpuDistribution] を作る。
 ##
 ## 元の [member distribution] は書き換えず、Preset と Strength を反映した複製を返す。
+## Advanced を開いていれば、その上書きも分布へ持たせる。Battle はこの分布から
+## 全 CPU の [CpuProfile] を作るので、ここで渡さないと個別調整が届かない。
 func build_distribution() -> CpuDistribution:
 	var built: CpuDistribution = distribution.duplicate()
 	built.preset = preset
+	built.profile_overrides = advanced_overrides.duplicate() if advanced_enabled else {}
 	built.average_strength = strength
 	built.minimum_strength = minf(built.minimum_strength, strength)
 	built.maximum_strength = maxf(built.maximum_strength, strength)
 	if built.fixed_strength_enabled:
 		built.fixed_strength = strength
 	return built
+
+
+## [param overrides] を [param profile] へ当てる。[constant ADVANCED_KEYS] 以外は無視する。
+static func apply_overrides(profile: CpuProfile, overrides: Dictionary) -> void:
+	for key in overrides:
+		if key in ADVANCED_KEYS:
+			profile.set(key, overrides[key])
 
 
 ## 標準最高難易度（Extreme）を超える設定かを返す（MVP 受入条件 24）。
