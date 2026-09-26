@@ -55,8 +55,8 @@ gd-tools init --non-interactive
 run_godot_step "Import" "$GODOT_DIAGNOSTICS_ERROR" "$godot_bin" --headless --import
 
 echo "==> テスト + カバレッジ計測"
-# CPU を実際に走らせて強さを比べるテストは、計測下では極端に遅いので飛ばす
-# （tests/cpu/test_cpu_presets.gd）。合否ゲートの scripts/run-tests.sh では走る。
+# CPU や Battle を実際に走らせるテストは、計測下では極端に遅いので飛ばす
+# （tests/coverage_guard.gd）。合否ゲートの scripts/run-tests.sh では走る。
 PROJECT99_COVERAGE=1 gd-tools test --coverage
 
 echo "==> LCOV を出力"

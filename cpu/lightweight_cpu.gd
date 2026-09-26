@@ -18,7 +18,10 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _timer_sec: float = 0.0
 var _pending_attack: float = 0.0
 var _pending_defense: float = 0.0
+var _pending_dig: float = 0.0
 var _update_count: int = 0
+var _last_cleared_garbage: int = 0
+var _last_applied_garbage: int = 0
 
 
 func _init(profile: CpuProfile = null, cpu_seed: int = 0) -> void:
@@ -51,6 +54,8 @@ func get_update_count() -> int:
 ##
 ## 更新は [constant UPDATE_INTERVAL_SEC] ごと。間のフレームでは何もしない。
 func update(delta_sec: float) -> int:
+	_last_cleared_garbage = 0
+	_last_applied_garbage = 0
 	_timer_sec += maxf(0.0, delta_sec)
 	if _timer_sec + GameRules.ACCUMULATION_EPSILON < UPDATE_INTERVAL_SEC:
 		return 0
@@ -63,6 +68,18 @@ func update(delta_sec: float) -> int:
 		attack += _step_once()
 	_update_count += steps
 	return attack
+
+
+## 直前の [method update] で、防御で捌いた Garbage 行数を返す。
+func get_last_cleared_garbage() -> int:
+	return _last_cleared_garbage
+
+
+## 直前の [method update] で、捌けずに盤面へ積んだ Garbage 行数を返す。
+##
+## KO の帰属は、この「実際に積んだ」行だけを対象にする（要件定義 §56）。
+func get_last_applied_garbage() -> int:
+	return _last_applied_garbage
 
 
 ## Garbage を受け取る。
@@ -85,12 +102,16 @@ func _step_once() -> int:
 	_pending_defense = fmod(_pending_defense - float(cleared), 1.0)
 	_indicators.incoming_garbage -= cleared
 	_indicators.stack_height += _indicators.incoming_garbage
+	_last_cleared_garbage += cleared
+	_last_applied_garbage += _indicators.incoming_garbage
 	_indicators.incoming_garbage = 0
 
-	# 自分でも少しずつ掘る。腕前が高いほど下がる。
-	_indicators.stack_height = maxi(
-		0, _indicators.stack_height - int(round(_indicators.skill * 2.0))
-	)
+	# 自分でも少しずつ掘る。腕前が高いほど速い。端数は次の周期へ持ち越す。
+	# 速さは CpuProfile.dig_rate_factor（受ける Garbage より遅くしておく）。
+	_pending_dig += _indicators.skill * _profile.dig_rate_factor * UPDATE_INTERVAL_SEC
+	var dug: int = int(_pending_dig)
+	_pending_dig -= float(dug)
+	_indicators.stack_height = maxi(0, _indicators.stack_height - dug)
 	_indicators.holes = maxi(0, _indicators.holes + (1 if _rng.randf() > _indicators.skill else -1))
 	_indicators.roughness = clampi(
 		_indicators.roughness + _rng.randi_range(-1, 1), 0, Board.VISIBLE_HEIGHT

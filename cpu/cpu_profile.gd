@@ -83,6 +83,12 @@ const MAX_BEAM_WIDTH: int = 40
 ## 1 秒あたりに捌ける Garbage 行数の見積もりに掛ける係数（PPS × Garbage Skill × この値）。
 @export_range(0.0, 2.0, 0.01, "or_greater") var defense_rate_factor: float = 0.5
 
+## 1 秒あたりに自分で掘れる行数に掛ける係数（腕前 × この値）。
+##
+## 平均して受ける Garbage（ほかの CPU の Attack）より遅くしておく。速いと受けた
+## Garbage をいくらでも掘り返せてしまい、CPU 同士の Battle で誰も脱落しない（#44）。
+@export_range(0.0, 2.0, 0.01, "or_greater") var dig_rate_factor: float = 0.25
+
 # --- 個別の重み（§68） ------------------------------------------------------
 # 符号は「評価値に足す向き」。悪い指標は負の重みにする。
 
