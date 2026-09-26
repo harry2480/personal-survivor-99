@@ -286,3 +286,13 @@ func test_runs_are_reproducible() -> void:
 	assert_eq(first.lines, second.lines, "同じ Seed からは同じ結果になる")
 	assert_eq(first.attack, second.attack, "Attack も同じ")
 	assert_eq(first.holes, second.holes, "盤面も同じ")
+
+
+func test_machine_speed_follows_the_last_node_of_the_table() -> void:
+	# Machine の速さは表の最後の節点から取る。節点を差し替えてもコードを直さずに済む。
+	mapping.strength_points = PackedFloat32Array([0.0, 100.0, 300.0])
+	mapping.pieces_per_second = PackedFloat32Array([1.0, 5.0, 40.0])
+
+	var profile: CpuProfile = mapping.create_machine_profile(100.0)
+
+	assert_eq(profile.pieces_per_second, 40.0, "最後の節点（300）の PPS まで上げる")

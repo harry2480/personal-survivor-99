@@ -133,7 +133,12 @@ func create_machine_profile(strength: float) -> CpuProfile:
 	profile.placement_quality = 1.0
 	profile.lookahead = PlacementSearch.MAX_SEARCH_DEPTH - 1
 	profile.beam_width = CpuProfile.MAX_BEAM_WIDTH
-	profile.pieces_per_second = maxf(profile.pieces_per_second, sample(pieces_per_second, 150.0))
+	# 表の最後の節点（Machine 相当）の速さを下回らせない。
+	if not strength_points.is_empty():
+		var top_strength: float = strength_points[strength_points.size() - 1]
+		profile.pieces_per_second = maxf(
+			profile.pieces_per_second, sample(pieces_per_second, top_strength)
+		)
 	profile.technique_usage = 1.0
 	profile.garbage_skill = 1.0
 	profile.target_skill = 1.0
