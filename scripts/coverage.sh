@@ -6,7 +6,7 @@
 # 書き換える。計測用のコードを製品へ混ぜないため、**一時ディレクトリへ写した
 # プロジェクトの上で**計測し、作業ツリーには結果（build/coverage/lcov.info）だけを戻す。
 #
-# 計測は通常のテストより数倍遅い（手元で約 2 分）。テストの合否ゲートは
+# 計測は通常のテストより数倍遅い（手元で約 3 分）。テストの合否ゲートは
 # scripts/run-tests.sh が担い、こちらはカバレッジを Codecov へ送るためだけに使う。
 #
 # 使い方:
@@ -55,7 +55,9 @@ gd-tools init --non-interactive
 run_godot_step "Import" "$GODOT_DIAGNOSTICS_ERROR" "$godot_bin" --headless --import
 
 echo "==> テスト + カバレッジ計測"
-gd-tools test --coverage
+# CPU を実際に走らせて強さを比べるテストは、計測下では極端に遅いので飛ばす
+# （tests/cpu/test_cpu_presets.gd）。合否ゲートの scripts/run-tests.sh では走る。
+PROJECT99_COVERAGE=1 gd-tools test --coverage
 
 echo "==> LCOV を出力"
 gd-tools coverage report --format lcov
