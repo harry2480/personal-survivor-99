@@ -9,6 +9,9 @@ extends GutTest
 ## 最小の操作で進める。狙いは強さではなく、**開始から終了まで Crash せず
 ## 決着する**ことの確認。
 
+## カバレッジ計測で、人数の多い Battle を飛ばすための判定。
+const CoverageGuard = preload("res://tests/coverage_guard.gd")
+
 const SEED: int = 20260922
 const TIME_LIMIT_SEC: float = 300.0
 const FRAME_DELTA: float = 1.0 / 60.0
@@ -16,11 +19,21 @@ const FRAMES_PER_DROP: int = 10
 
 var runners: Array = []
 
+# 人数ごとに一度だけ走らせた Battle。完走・Frame Time・再現性の確認で使い回す。
+# 99 人戦は 1 回 40 秒近くかかるので、テストごとに走らせ直さない。
+var _finished_battles: Dictionary = {}
+
 
 func after_each() -> void:
 	for runner in runners:
 		runner.dispose()
 	runners.clear()
+
+
+func after_all() -> void:
+	for runner in _finished_battles.values():
+		runner.dispose()
+	_finished_battles.clear()
 
 
 func _distribution() -> CpuDistribution:
@@ -81,11 +94,13 @@ func _assert_targets_are_safe(runner: CpuBattleRunner) -> void:
 
 
 func _run_scaling_case(player_count: int) -> CpuBattleRunner:
-	var runner: CpuBattleRunner = _new_battle(player_count)
+	if not _finished_battles.has(player_count):
+		var battle := CpuBattleRunner.new(player_count - 1, _distribution(), null, SEED, 1)
+		_run(battle)
+		_finished_battles[player_count] = battle
+	var runner: CpuBattleRunner = _finished_battles[player_count]
 
-	var finished: bool = _run(runner)
-
-	assert_true(finished, "%d 人戦が完走する" % player_count)
+	assert_true(runner.get_manager().is_finished(), "%d 人戦が完走する" % player_count)
 	assert_eq(runner.get_manager().get_alive_count(), 1, "生き残りは 1 人")
 	assert_eq(runner.get_manager().get_player_count(), player_count, "人数の構成どおり")
 	_assert_ranks_are_consistent(runner, player_count)
@@ -105,14 +120,20 @@ func test_ten_player_battle_finishes() -> void:
 
 
 func test_thirty_player_battle_finishes() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	_run_scaling_case(30)
 
 
 func test_fifty_player_battle_finishes() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	_run_scaling_case(50)
 
 
 func test_ninety_nine_player_battle_finishes() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	# 要件定義 §44 の標準構成（Human × 1 + CPU × 98）。
 	var runner: CpuBattleRunner = _run_scaling_case(99)
 
@@ -136,7 +157,8 @@ func test_ninety_nine_player_battle_finishes() -> void:
 
 
 func test_frame_time_is_measured() -> void:
-	var runner: CpuBattleRunner = _run_scaling_case(30)
+	# 記録されることを見るだけなので、軽い 10 人戦で見る（カバレッジ計測でも走る）。
+	var runner: CpuBattleRunner = _run_scaling_case(10)
 
 	assert_gt(runner.get_frame_count(), 0, "フレーム数が記録される")
 	assert_gt(runner.get_average_frame_msec(), 0.0, "平均 Frame Time が記録される")
@@ -146,8 +168,11 @@ func test_frame_time_is_measured() -> void:
 
 
 func test_simulation_keeps_the_frame_budget() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	# 要件定義 §105: 99 人戦で平均 60 FPS 以上。描画を含まない Simulation の
 	# 時間がここで予算（16.6 ms）を食い潰していないことを見る。
+	# 実時間を測るので、処理が数倍遅くなるカバレッジ計測では意味がなく、飛ばす。
 	var runner: CpuBattleRunner = _run_scaling_case(99)
 
 	assert_lt(runner.get_average_frame_msec(), 16.6, "99 人でも 1 フレームの予算に収まる")
@@ -157,8 +182,10 @@ func test_simulation_keeps_the_frame_budget() -> void:
 
 
 func test_scaling_battles_are_reproducible() -> void:
-	var first: CpuBattleRunner = _new_battle(30)
-	_run(first)
+	if CoverageGuard.skip_heavy_test(self):
+		return
+	# 完走の確認で走らせた 30 人戦と、同じ Seed で走らせ直した 30 人戦を比べる。
+	var first: CpuBattleRunner = _run_scaling_case(30)
 	var second: CpuBattleRunner = _new_battle(30)
 	_run(second)
 
