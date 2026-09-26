@@ -45,6 +45,22 @@ var current_state: GameState.State = GameState.State.BOOT
 
 var _current_scene_path: String = ""
 var _battle_setup: BattleSetup = BattleSetup.create_default()
+var _user_settings: UserSettings = null
+
+
+## ユーザー設定を返す（要件定義 §97 / §98）。
+##
+## まだ読んでいなければ、ここで `user://` から読む。読めなければ既定値。
+func get_user_settings() -> UserSettings:
+	if _user_settings == null:
+		_user_settings = SettingsStore.new().load_settings()
+	return _user_settings
+
+
+## ユーザー設定を差し替える（Settings 画面が保存したあとに呼ぶ）。
+func set_user_settings(settings: UserSettings) -> void:
+	if settings != null:
+		_user_settings = settings
 
 
 ## その遷移が許されているかを返す（要件定義 §109）。

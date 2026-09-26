@@ -96,7 +96,8 @@ func _init(
 	distribution: CpuDistribution = null,
 	mapping: CpuStrengthMapping = null,
 	battle_seed: int = 0,
-	human_count: int = 0
+	human_count: int = 0,
+	human_rules: GameRules = null
 ) -> void:
 	var rules := GameRules.create_default()
 	# Lightweight の CPU は盤面を動かさない。放っておいた盤面が勝手に
@@ -114,6 +115,10 @@ func _init(
 	_manager.player_eliminated.connect(_on_eliminated)
 
 	_register_cpus(cpu_count, distribution, mapping, battle_seed)
+	# Human は普通のルール（Gravity あり）で遊ぶ。CPU 側の都合で止めた
+	# Gravity を人間へ持ち込まない。
+	if human_count > 0:
+		_apply_human_rules(human_rules if human_rules != null else GameRules.create_default())
 	_connect_humans()
 	_targets.update_all_targets()
 
@@ -333,6 +338,17 @@ func _sync_battle_state() -> void:
 		var indicators: CpuIndicators = _cpus.get_indicators(player.player_id)
 		player.danger_level = indicators.danger_level
 		player.incoming_garbage = indicators.incoming_garbage
+
+
+# Human の盤面を、人間向けのルールで作り直す。
+func _apply_human_rules(rules: GameRules) -> void:
+	for player in _manager.get_players():
+		if not player.is_human():
+			continue
+		var player_seed: int = _manager.get_seed_for(player.player_id)
+		var session := PuzzleSession.new(rules, PieceRandomizer.new(player_seed), _balance)
+		session.start(player_seed)
+		player.attach_session(session)
 
 
 # Human の盤面が出した Attack も同じ経路へ載せる（要件定義 §40）。

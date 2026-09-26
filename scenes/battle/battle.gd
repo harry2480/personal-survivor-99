@@ -107,13 +107,27 @@ func _create_runner() -> CpuBattleRunner:
 		_setup.build_distribution(),
 		mapping if mapping is CpuStrengthMapping else null,
 		_setup.resolve_seed(),
-		1
+		1,
+		_load_human_rules()
 	)
 
 	# CPU の更新は分散する（要件定義 §104 / #47）。
 	var policy: Resource = load("res://config/cpu_scheduling.tres")
 	runner.enable_scheduling(policy if policy is CpuSchedulePolicy else null)
 	return runner
+
+
+# 自分の盤面のルールを作る。config の値に、ユーザー設定（#52）を重ねる。
+func _load_human_rules() -> GameRules:
+	var loaded: Resource = load("res://config/game_rules.tres")
+	var rules: GameRules = loaded if loaded is GameRules else GameRules.create_default()
+	var settings: UserSettings = SceneRouter.get_user_settings()
+	SettingsApplier.apply_gameplay(settings, rules)
+	# Dead Zone は Input の設定（要件定義 §97）。Game Core の GameRules には持たせない。
+	InputManager.apply_dead_zone(
+		settings.stick_dead_zone if settings != null else InputManager.DEFAULT_DEAD_ZONE
+	)
+	return rules
 
 
 func _build_views() -> void:
