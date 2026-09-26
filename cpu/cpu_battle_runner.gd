@@ -161,6 +161,10 @@ func assign_profiles(profiles: Array[CpuProfile]) -> void:
 		_strengths[player.player_id] = profiles[index].strength
 		index += 1
 
+	# 分散していれば、差し替えた Profile を基準値として取り直す。
+	if _scheduler != null:
+		_scheduler.sync_profiles()
+
 
 ## 決着まで進める。決着したら [code]true[/code]。
 ##
