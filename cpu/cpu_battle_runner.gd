@@ -51,6 +51,23 @@ class Result:
 	var survival_sec: float = 0.0
 
 
+## 1 フレームの処理時間の記録（要件定義 §102 / §105）。
+class FrameStats:
+	extends RefCounted
+
+	## 進めたフレーム数。
+	var frames: int = 0
+
+	## 1 フレームの平均処理時間（ミリ秒）。
+	var average_msec: float = 0.0
+
+	## 1 フレームの最大処理時間（ミリ秒）。
+	var max_msec: float = 0.0
+
+	## 平均から見込める FPS。描画を含まない Simulation だけの値。
+	var estimated_fps: float = 0.0
+
+
 var _manager: BattleManager
 var _targets: TargetManager
 var _cpus: CpuManager
@@ -125,6 +142,11 @@ func get_cpu_manager() -> CpuManager:
 ## Target の管理を返す。
 func get_target_manager() -> TargetManager:
 	return _targets
+
+
+## KO と順位の管理を返す。
+func get_ko_system() -> KoSystem:
+	return _ko
 
 
 ## 経過時間（秒）を返す。
@@ -222,31 +244,19 @@ func step(delta_sec: float) -> void:
 		_scheduler.observe_frame_time(float(elapsed_usec) / 1000.0)
 
 
-## 進めたフレーム数を返す。
-func get_frame_count() -> int:
-	return _frame_count
-
-
-## 1 フレームの平均処理時間（ミリ秒）を返す。
-func get_average_frame_msec() -> float:
-	if _frame_count <= 0:
-		return 0.0
-	return float(_frame_usec_total) / float(_frame_count) / 1000.0
-
-
-## 1 フレームの最大処理時間（ミリ秒）を返す。
-func get_max_frame_msec() -> float:
-	return float(_frame_usec_max) / 1000.0
-
-
-## 平均処理時間から見込める FPS を返す（要件定義 §102 / §105）。
+## 1 フレームの処理時間の記録を返す（要件定義 §102 / §105）。
 ##
-## 描画を含まない Simulation だけの値。上限は測定の意味がないので 1000 で止める。
-func get_estimated_fps() -> float:
-	var average_msec: float = get_average_frame_msec()
-	if average_msec <= 0.0:
-		return 1000.0
-	return minf(1000.0, 1000.0 / average_msec)
+## FPS 換算は上限を 1000 で止める。それより上は測っても意味がないため。
+func get_frame_stats() -> FrameStats:
+	var stats := FrameStats.new()
+	stats.frames = _frame_count
+	stats.max_msec = float(_frame_usec_max) / 1000.0
+	if _frame_count > 0:
+		stats.average_msec = float(_frame_usec_total) / float(_frame_count) / 1000.0
+	stats.estimated_fps = (
+		1000.0 if stats.average_msec <= 0.0 else minf(1000.0, 1000.0 / stats.average_msec)
+	)
+	return stats
 
 
 ## CPU の更新を分散する（要件定義 §104 / #47）。
