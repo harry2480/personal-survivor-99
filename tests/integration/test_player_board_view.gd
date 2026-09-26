@@ -62,6 +62,21 @@ func test_fixed_blocks_are_shown() -> void:
 	assert_eq(view.get_cell(Board.WIDTH - 1, Board.VISIBLE_HEIGHT - 1), Board.EMPTY, "空きは空き")
 
 
+func test_restarting_the_session_clears_the_shown_blocks() -> void:
+	# 同じ Session を start() で再開すると盤面は消える。Lock も Line Clear も起きないが、
+	# 表示も読み直して前の盤面を残さない。
+	_fill_bottom_row()
+	session.hard_drop()
+	view.refresh()
+	assert_ne(view.get_cell(0, Board.VISIBLE_HEIGHT - 1), Board.EMPTY, "再開前は置いたブロックが見える")
+
+	session.start(SEED)
+	view.refresh()
+
+	for x in range(Board.WIDTH):
+		assert_eq(view.get_cell(x, Board.VISIBLE_HEIGHT - 1), Board.EMPTY, "再開後は列 %d が空" % x)
+
+
 func test_garbage_rows_are_shown() -> void:
 	# Garbage は Delay 経過後、次の Lock で盤面へ入る（要件定義 §40〜§41）。
 	session.receive_garbage_lines(3)
