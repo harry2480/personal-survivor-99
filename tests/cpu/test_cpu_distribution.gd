@@ -6,6 +6,9 @@ extends GutTest
 ## 分布が Seed で再現されること、試合途中に CPU が強くならないこと
 ## （Dynamic Difficulty は既定 OFF）、弱い CPU から先に脱落することを見る。
 
+## カバレッジ計測で Battle を最後まで走らせるテストを飛ばすための判定。
+const CoverageGuard = preload("res://tests/coverage_guard.gd")
+
 const SEED: int = 20260921
 const CPU_COUNT: int = 12
 const BATTLE_LIMIT_SEC: float = 120.0
@@ -263,6 +266,8 @@ func test_next_distribution_stays_within_the_adjustable_range() -> void:
 
 
 func test_cpu_strength_never_changes_during_a_battle() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	# 要件定義 §75: 試合途中に CPU を不自然に強化しない。
 	var runner: CpuBattleRunner = _new_runner(_spread_distribution())
 	var cpus: CpuManager = runner.get_cpu_manager()
@@ -299,6 +304,8 @@ func test_cpus_cannot_dig_faster_than_they_are_attacked() -> void:
 
 
 func test_battle_finishes_and_ranks_everyone() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	var runner: CpuBattleRunner = _new_runner(_spread_distribution())
 
 	var finished: bool = runner.run(BATTLE_LIMIT_SEC)
@@ -319,6 +326,8 @@ func test_battle_finishes_and_ranks_everyone() -> void:
 
 
 func test_strong_cpus_survive_longer_than_weak_ones() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	var runner: CpuBattleRunner = _new_runner(_spread_distribution())
 	runner.run(BATTLE_LIMIT_SEC)
 
@@ -336,6 +345,8 @@ func test_strong_cpus_survive_longer_than_weak_ones() -> void:
 
 
 func test_fixed_strength_battle_also_finishes() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	# 全員同じ強さでも決着する（Challenge / Benchmark 用途。要件定義 §74）。
 	var runner: CpuBattleRunner = _new_runner(CpuDistribution.create_fixed(100.0))
 
@@ -425,6 +436,8 @@ func test_simultaneous_top_out_counts_only_real_eliminations() -> void:
 
 
 func test_battle_is_reproducible() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	var first: CpuBattleRunner = _new_runner(_spread_distribution())
 	first.run(BATTLE_LIMIT_SEC)
 	var second: CpuBattleRunner = _new_runner(_spread_distribution())
