@@ -19,6 +19,7 @@ macOS（Apple Silicon）向けの 99 人対戦型 落ちものパズルゲーム
 scripts/static-check.sh         # Lint / フォーマット / 命名規約 / 依存方向
 scripts/verify-godot.sh         # import + 起動検証（CI と同じ）
 scripts/run-tests.sh            # GUT の自動テストを headless 実行
+scripts/coverage.sh             # カバレッジ計測（LCOV。gd-tools が必要）
 scripts/export-macos.sh         # macOS Export Validation（Export Templates が必要）
 scripts/setup-loop-labels.sh   # Loop 用ラベルの作成・更新
 scripts/loop-once.sh           # Loopを1回だけ実行
@@ -29,6 +30,7 @@ bash scripts/merge-pr.sh       # PR マージ + ブランチ整理
 自動テストは GUT で書き、`scripts/run-tests.sh` で実行する。
 CI（Static Check / Import / Headless テスト / macOS Export Validation）は
 `.github/workflows/ci.yml` で、ローカルと同じスクリプトを呼ぶ。
+Coverage job は `scripts/coverage.sh` の結果を Codecov へ送る（合否ゲートには含めない）。
 
 Loopを使う場合は [docs/loop-engineering.md](docs/loop-engineering.md) の初期設定、Issue信頼境界、auto-merge条件に従う。Loop関連コマンドは `.claude/commands/loop-*.md` に定義する。
 

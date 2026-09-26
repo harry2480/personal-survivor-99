@@ -1,0 +1,22 @@
+# Codecov の設定。カバレッジは scripts/coverage.sh が出す LCOV（build/coverage/lcov.info）。
+#
+# 合否ゲートは CI（ci-status）が担う。Codecov の status check は参考表示に留め、
+# カバレッジの増減で PR を止めない。
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "diff, flags, files"
+  require_changes: true
+
+# テストと計測・検証用のスクリプトは対象外（gd-tools も tests/ と addons/ は測らない）。
+ignore:
+  - "tests/**"
+  - "tools/**"
+  - "addons/**"
