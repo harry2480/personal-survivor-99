@@ -420,9 +420,22 @@ func _send_attack(source_id: int, line_count: int) -> void:
 func _attribute_applied_garbage() -> void:
 	for victim_id in _pending_garbage:
 		var queue: Array = _pending_garbage[victim_id]
+		if _cpus.get_mode(victim_id) == CpuManager.Mode.DETAILED:
+			# Detailed へ昇格すると、受信待ちの Garbage は盤面へ移る（CpuManager の昇格処理）。
+			# 以後は積まれた行数が返らないので、残りはここで記録して列を空にする。
+			# 放っておくと、降格したときに古い送り手へ KO が付く。
+			_consume_garbage(queue, _count_lines(queue), victim_id)
+			continue
 		var result: Vector2i = _cpus.take_garbage_result(victim_id)
 		_consume_garbage(queue, result.x, -1)
 		_consume_garbage(queue, result.y, victim_id)
+
+
+func _count_lines(queue: Array) -> int:
+	var total: int = 0
+	for entry in queue:
+		total += entry[1]
+	return total
 
 
 # queue の先頭から line_count 行を取り除く。victim_id が 0 以上なら、取り除いた行を
