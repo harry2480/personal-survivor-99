@@ -62,4 +62,4 @@ description: 指定したPRの未解決レビューコメントに対応する
 - **Resolvedされたコメントは無視する**: GitHub上でresolvedとしてマークされたレビュースレッドは対応済みとみなし、処理対象から除外する
 - レビューコメントの意図が不明な場合は、勝手に解釈せずユーザーに確認を取る
 - 大きな設計変更が必要な場合は、修正前にユーザーの承認を得る
-- 修正後は `npm run typecheck` と `npm run lint` を実行し、エラーがないことを確認する
+- 修正後は `scripts/static-check.sh` と `scripts/verify-godot.sh` を実行し、エラーがないことを確認する
