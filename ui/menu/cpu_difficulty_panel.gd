@@ -25,6 +25,7 @@ const STRENGTH_STEP: float = 1.0
 const MAX_VARIATION: float = 50.0
 
 var _settings: CpuSettings = CpuSettings.create_default()
+var _mapping: CpuStrengthMapping = null
 var _developer_mode: bool = false
 var _updating: bool = false
 
@@ -82,6 +83,14 @@ func set_settings(settings: CpuSettings) -> void:
 		return
 	_settings = settings
 	_apply_settings_to_controls()
+
+
+## Advanced の表示に使う変換表を設定する。Battle が使うものと同じ表を渡す。
+##
+## 渡さなければ既定の表（[method CpuStrengthMapping.create_default]）を使う。
+func set_mapping(mapping: CpuStrengthMapping) -> void:
+	_mapping = mapping
+	_refresh_advanced_values()
 
 
 ## Machine / Human-like を選べるようにするか（要件定義 §71 / §72）。
@@ -251,7 +260,11 @@ func _apply_settings_to_controls() -> void:
 func _refresh_advanced_values() -> void:
 	var was_updating: bool = _updating
 	_updating = true
-	var base: CpuProfile = CpuPreset.create_profile_at(_settings.preset, _settings.strength)
+	if _advanced_spins.is_empty():
+		return
+	var base: CpuProfile = CpuPreset.create_profile_at(
+		_settings.preset, _settings.strength, _mapping
+	)
 	for key in _advanced_spins:
 		var value: Variant = _settings.advanced_overrides.get(key, base.get(key))
 		_advanced_spins[key].value = float(value)

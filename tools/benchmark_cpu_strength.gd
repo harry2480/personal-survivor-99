@@ -10,7 +10,8 @@ extends SceneTree
 ## 実行は scripts/benchmark-cpu-strength.sh。
 
 const SEED: int = 20260922
-const BATTLES: int = 5
+## 試合数。Strength の数（7）の倍数にして、どの Strength も全部の席を同じ回数だけ回す。
+const BATTLES: int = 28
 const TIME_LIMIT_SEC: float = 180.0
 
 

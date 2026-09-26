@@ -10,6 +10,10 @@ extends RefCounted
 ## 1 試合につき、指定した Strength を 1 体ずつ並べる。Seed は試合ごとにずらす
 ## ので、同じ [param benchmark_seed] からは同じ結果が出る（要件定義 §110）。
 ##
+## 席（Player ID）は試合ごとに 1 つずつずらす。時間切れで畳むときや Target の
+## 同点処理は Player ID の順に決まるので、席を固定すると結果が席に寄るため。
+## 試合数を Strength の数の倍数にすると、どの Strength も全部の席を同じ回数だけ回る。
+##
 ## 実行時間が長くなるため、通常の CI の必須 check には含めない（#45 の制約）。
 ## 実行は `scripts/benchmark-cpu-strength.sh`。
 
@@ -98,7 +102,7 @@ func run_strength_sweep(
 		return results
 
 	for battle_index in range(battles):
-		_run_battle(strengths, results, benchmark_seed + battle_index * 104_729)
+		_run_battle(strengths, results, benchmark_seed + battle_index * 104_729, battle_index)
 
 	return results
 
@@ -125,21 +129,35 @@ static func format_report(results: Array[StrengthResult]) -> String:
 	return "\n".join(lines)
 
 
+## [param rotation] 試合目に、[param seat] 番目の席へ座らせる Strength の添字を返す。
+static func strength_index_for_seat(seat: int, rotation: int, count: int) -> int:
+	if count <= 0:
+		return -1
+	return posmod(seat + rotation, count)
+
+
 func _run_battle(
-	strengths: PackedFloat32Array, results: Array[StrengthResult], battle_seed: int
+	strengths: PackedFloat32Array, results: Array[StrengthResult], battle_seed: int, rotation: int
 ) -> void:
 	var runner := CpuBattleRunner.new(strengths.size(), null, _mapping, battle_seed)
 	# Strength は 1 体ずつ違うので、分布ではなく席ごとに割り当てる。
-	# Player ID と strengths の添字が対応する。
+	# 席は試合ごとにずらし、Player ID から元の Strength の添字へ戻せるよう覚えておく。
 	var profiles: Array[CpuProfile] = []
-	for strength in strengths:
-		profiles.append(CpuPreset.create_profile_at(_preset, strength, _mapping))
+	var strength_index_by_player: Dictionary = {}
+	var seat: int = 0
+	for player in runner.get_manager().get_players():
+		if player.player_type != PlayerType.Type.CPU or seat >= strengths.size():
+			continue
+		var strength_index: int = strength_index_for_seat(seat, rotation, strengths.size())
+		profiles.append(CpuPreset.create_profile_at(_preset, strengths[strength_index], _mapping))
+		strength_index_by_player[player.player_id] = strength_index
+		seat += 1
 	runner.assign_profiles(profiles)
 
 	runner.run(_time_limit_sec)
 
 	for result in runner.get_results():
-		var index: int = result.player_id
+		var index: int = strength_index_by_player.get(result.player_id, -1)
 		if index < 0 or index >= results.size():
 			continue
 		var summary: StrengthResult = results[index]

@@ -21,5 +21,7 @@ version="$(assert_godot_version "$godot_bin" "$repo_root")"
 echo "Godot: ${version}"
 echo
 
-"$godot_bin" --headless --import >/dev/null
-"$godot_bin" --headless -s res://tools/benchmark_cpu_strength.gd
+# Godot はスクリプトエラーでも終了コード 0 を返すので、出力も走査する。
+run_godot_step "Import" "$GODOT_DIAGNOSTICS_ERROR" "$godot_bin" --headless --import
+run_godot_step "Benchmark" "$GODOT_DIAGNOSTICS_ERROR" \
+  "$godot_bin" --headless -s res://tools/benchmark_cpu_strength.gd

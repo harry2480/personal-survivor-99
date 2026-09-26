@@ -84,6 +84,29 @@ func test_different_seed_changes_the_result() -> void:
 	assert_true(differs, "Seed が違えば試合の中身も変わる")
 
 
+func test_every_strength_sits_in_every_seat() -> void:
+	# 席（Player ID）で結果が寄らないよう、試合ごとに席をずらす。
+	var count: int = strengths.size()
+	for index in range(count):
+		var seats: Dictionary = {}
+		for rotation in range(count):
+			for seat in range(count):
+				if CpuBenchmark.strength_index_for_seat(seat, rotation, count) == index:
+					seats[seat] = true
+		assert_eq(seats.size(), count, "Strength %d は Strength の数だけ回すと全部の席に座る" % index)
+
+
+func test_results_follow_the_strength_not_the_seat() -> void:
+	# 席をずらしても、集計は元の Strength の並びに戻す。
+	var results: Array[CpuBenchmark.StrengthResult] = benchmark.run_strength_sweep(
+		PackedFloat32Array([10.0, 150.0]), 2, SEED
+	)
+
+	assert_eq(results[1].strength, 150.0, "並びは指定どおり")
+	assert_eq(results[1].wins, 2, "どちらの席に座っても 150 が勝つ")
+	assert_eq(results[0].wins, 0, "10 は勝たない")
+
+
 func test_report_is_a_table() -> void:
 	var report: String = CpuBenchmark.format_report(_sweep())
 

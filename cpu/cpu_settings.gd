@@ -99,6 +99,9 @@ func build_distribution() -> CpuDistribution:
 	built.preset = preset
 	built.profile_overrides = advanced_overrides.duplicate() if advanced_enabled else {}
 	built.average_strength = strength
+	# 範囲は選んだ Strength を含むように広げる。Preset を選んだとき（Easy 30 / Machine 150）や
+	# Custom で 110 を超えたとき（MVP 受入条件 24）に、既定の Min 45 / Max 110 で
+	# 切り詰めないため。Strength が範囲内なら、入力した Min / Max はそのまま使う。
 	built.minimum_strength = minf(built.minimum_strength, strength)
 	built.maximum_strength = maxf(built.maximum_strength, strength)
 	if built.fixed_strength_enabled:

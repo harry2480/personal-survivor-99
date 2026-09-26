@@ -153,6 +153,45 @@ func test_advanced_shows_the_values_of_the_chosen_strength() -> void:
 	assert_eq(panel.get_advanced_value("misdrop_rate"), 0.5, "上書きした項目は Strength を変えても残る")
 
 
+func test_advanced_uses_the_mapping_given_by_the_battle() -> void:
+	# Battle と同じ変換表で表示する。既定の表と違う値になる表を渡して確かめる。
+	var mapping := CpuStrengthMapping.create_default()
+	mapping.pieces_per_second = PackedFloat32Array([1.0, 1.0, 1.0, 1.0, 1.0, 7.0, 7.0])
+	panel.set_mapping(mapping)
+	_select_preset(CpuPreset.Preset.CUSTOM)
+	panel.set_strength_value(100.0)
+
+	assert_almost_eq(panel.get_advanced_value("pieces_per_second"), 7.0, 0.05, "渡した表の値を出す")
+
+
+func test_distribution_follows_a_preset_outside_the_default_range() -> void:
+	# 既定の範囲（Min 45 / Max 110）の外にある Preset でも、その Strength の CPU を作る。
+	# 範囲を広げないと、Easy は 45 以上、Machine は 110 以下に切り詰められる。
+	panel.set_developer_mode(true)
+
+	_select_preset(CpuPreset.Preset.EASY)
+	var easy: PackedFloat32Array = panel.get_settings().build_distribution().generate(20, 1)
+	assert_lt(_minimum(easy), 45.0, "Easy（30）の CPU は Min 45 で切り詰められない")
+
+	_select_preset(CpuPreset.Preset.MACHINE)
+	var machine: PackedFloat32Array = panel.get_settings().build_distribution().generate(20, 1)
+	assert_gt(_maximum(machine), 110.0, "Machine（150）の CPU は Max 110 で切り詰められない")
+
+
+func _minimum(values: PackedFloat32Array) -> float:
+	var result: float = INF
+	for value in values:
+		result = minf(result, value)
+	return result
+
+
+func _maximum(values: PackedFloat32Array) -> float:
+	var result: float = -INF
+	for value in values:
+		result = maxf(result, value)
+	return result
+
+
 func test_advanced_overrides_reach_every_cpu_in_the_battle() -> void:
 	# Battle は build_distribution() の分布から全 CPU を作る。個別調整がそこまで届くこと。
 	_select_preset(CpuPreset.Preset.CUSTOM)
