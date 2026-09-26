@@ -134,9 +134,14 @@ func get_strength(player_id: int) -> float:
 ## [param time_limit_sec] を超えたら、盤面が悪い順に畳んで順位を確定させる。
 ## 実力が拮抗すると Garbage を相殺し合って決着しないため、上限を必ず設ける。
 ## 何人が実際に Top Out したかは [method get_combat_elimination_count] で分かる。
+##
+## [param delta_sec] が 0 以下だと時間が進まず上限に届かないので、何もせず返す。
 func run(
 	time_limit_sec: float = DEFAULT_TIME_LIMIT_SEC, delta_sec: float = DEFAULT_FRAME_DELTA
 ) -> bool:
+	if delta_sec <= 0.0:
+		return _manager.is_finished()
+
 	while _elapsed_sec < time_limit_sec and not _manager.is_finished():
 		step(delta_sec)
 
@@ -238,7 +243,11 @@ func _eliminate_topped_out() -> void:
 
 
 # 時間切れのときに、盤面が悪い順へ畳んで順位を確定させる。
+#
+# 畳んだ脱落は Top Out ではないので KO にしない。KoSystem は脱落の理由を
+# 区別せず直近の攻撃者に KO を付けるため、先に攻撃の履歴を消しておく。
 func _finish_by_standing() -> void:
+	_attribution.clear()
 	while _manager.get_alive_count() > 1:
 		var worst_id: int = _find_worst_standing()
 		if worst_id < 0:

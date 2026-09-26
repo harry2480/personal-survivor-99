@@ -10,6 +10,9 @@ const SEED: int = 20260921
 const CPU_COUNT: int = 12
 const BATTLE_LIMIT_SEC: float = 120.0
 
+## 誰も Top Out しないうちに時間切れにするための上限（秒）。
+const SHORT_LIMIT_SEC: float = 10.0
+
 var mapping: CpuStrengthMapping
 var runners: Array = []
 
@@ -209,6 +212,54 @@ func test_dynamic_difficulty_does_not_touch_the_original_distribution() -> void:
 	assert_eq(distribution.average_strength, before, "元の分布は書き換えない")
 
 
+func test_default_weights_only_use_the_win_rate() -> void:
+	var dynamic := DynamicDifficulty.create_default()
+	dynamic.enabled = true
+
+	var top: DynamicDifficulty.Outcome = DynamicDifficulty.Outcome.create(0.5, 1.0, 10.0, 600.0)
+	var bottom: DynamicDifficulty.Outcome = DynamicDifficulty.Outcome.create(0.5, 99.0, 0.0, 10.0)
+
+	assert_eq(
+		dynamic.plan_next_strength(75.0, top),
+		dynamic.plan_next_strength(75.0, bottom),
+		"既定では勝率が同じなら順位・KO・生存時間に関わらず同じ"
+	)
+
+
+func test_every_outcome_can_drive_the_adjustment() -> void:
+	# 要件定義 §76: Win Rate / Average Rank / KO Count / Survival Time から調整できる。
+	var even: DynamicDifficulty.Outcome = DynamicDifficulty.Outcome.create(0.5, 50.0, 1.0, 180.0)
+	var cases: Dictionary = {
+		"average_rank_weight": DynamicDifficulty.Outcome.create(0.5, 10.0, 1.0, 180.0),
+		"ko_count_weight": DynamicDifficulty.Outcome.create(0.5, 50.0, 3.0, 180.0),
+		"survival_time_weight": DynamicDifficulty.Outcome.create(0.5, 50.0, 1.0, 360.0),
+	}
+
+	for weight in cases:
+		var dynamic := DynamicDifficulty.create_default()
+		dynamic.enabled = true
+		dynamic.win_rate_weight = 0.0
+		dynamic.set(weight, 1.0)
+
+		assert_eq(dynamic.plan_next_strength(75.0, even), 75.0, "%s: 目標どおりなら動かない" % weight)
+		assert_gt(dynamic.plan_next_strength(75.0, cases[weight]), 75.0, "%s: 良い成績なら強くする" % weight)
+
+
+func test_next_distribution_stays_within_the_adjustable_range() -> void:
+	var dynamic := DynamicDifficulty.create_default()
+	dynamic.enabled = true
+	var winning: DynamicDifficulty.Outcome = DynamicDifficulty.Outcome.create(1.0, 1.0)
+
+	# 勝ち続けて何度も強くしても、分布の両端が調整の範囲を越えない。
+	var distribution: CpuDistribution = CpuDistribution.create_default()
+	for _battle in range(20):
+		distribution = dynamic.plan_next_distribution(distribution, winning)
+
+	assert_lte(distribution.maximum_strength, dynamic.maximum_strength, "最大は範囲の上限まで")
+	assert_lte(distribution.minimum_strength, distribution.maximum_strength, "最小 ≤ 最大は崩れない")
+	assert_true(distribution.is_valid(), "分布として正しい形のまま")
+
+
 func test_cpu_strength_never_changes_during_a_battle() -> void:
 	# 要件定義 §75: 試合途中に CPU を不自然に強化しない。
 	var runner: CpuBattleRunner = _new_runner(_spread_distribution())
@@ -287,6 +338,31 @@ func test_fixed_strength_battle_also_finishes() -> void:
 	var runner: CpuBattleRunner = _new_runner(CpuDistribution.create_fixed(100.0))
 
 	assert_true(runner.run(BATTLE_LIMIT_SEC), "Fixed Strength でも順位が付く")
+
+
+func test_run_ignores_a_non_positive_frame_delta() -> void:
+	# 時間が進まないと上限に届かず、戻ってこなくなる。
+	var runner: CpuBattleRunner = _new_runner(_spread_distribution())
+
+	assert_false(runner.run(BATTLE_LIMIT_SEC, 0.0), "0 秒刻みでは進めない")
+	assert_false(runner.run(BATTLE_LIMIT_SEC, -1.0), "負の刻みでも進めない")
+	assert_eq(runner.get_elapsed_sec(), 0.0, "時間は進んでいない")
+
+
+func test_players_folded_at_the_time_limit_are_not_counted_as_kos() -> void:
+	# Attack は飛び交っているが、誰も Top Out しないうちに時間切れにする。
+	var runner: CpuBattleRunner = _new_runner(_spread_distribution())
+	runner.run(SHORT_LIMIT_SEC)
+
+	var sent: int = 0
+	var kos: int = 0
+	for result in runner.get_results():
+		sent += result.attack_sent
+		kos += result.ko_count
+
+	assert_true(runner.is_timed_out(), "時間切れで畳んでいる")
+	assert_gt(sent, 0, "Attack は送られている")
+	assert_eq(kos, runner.get_combat_elimination_count(), "KO は実際に Top Out させたぶんだけ（畳んだぶんは数えない）")
 
 
 func test_battle_is_reproducible() -> void:
