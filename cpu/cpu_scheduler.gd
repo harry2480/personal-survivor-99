@@ -36,6 +36,8 @@ var _below_frames: int = 0
 var _above_frames: int = 0
 var _original_lookahead: Dictionary = {}
 var _original_beam_width: Dictionary = {}
+# 基準値を取った Profile。差し替えられたら取り直す。
+var _baseline_profiles: Dictionary = {}
 var _original_detailed_limit: int = 0
 
 
@@ -53,8 +55,32 @@ func refresh_order() -> void:
 	for player_id in _order:
 		if not _last_update_sec.has(player_id):
 			_last_update_sec[player_id] = _total_sec
-			_original_lookahead[player_id] = _cpus.get_profile(player_id).lookahead
-			_original_beam_width[player_id] = _cpus.get_profile(player_id).beam_width
+	_sync_baselines()
+
+
+## Profile が差し替えられた CPU の基準値を取り直し、いまの削減段階を当て直す。
+##
+## [method CpuBattleRunner.assign_profiles] のように、同じ ID の Profile を
+## 後から差し替えたときに呼ぶ。取り直さないと、段階を戻すときに差し替える前の
+## Profile の Lookahead / Beam Width を新しい Profile へ書き込んでしまう。
+func sync_profiles() -> void:
+	if _sync_baselines():
+		_apply_level()
+
+
+# 基準値を取っていない、または Profile が差し替えられた CPU の基準値を取る。
+# 取り直した CPU があれば true。
+func _sync_baselines() -> bool:
+	var changed: bool = false
+	for player_id in _order:
+		var profile: CpuProfile = _cpus.get_profile(player_id)
+		if profile == null or _baseline_profiles.get(player_id) == profile:
+			continue
+		_baseline_profiles[player_id] = profile
+		_original_lookahead[player_id] = profile.lookahead
+		_original_beam_width[player_id] = profile.beam_width
+		changed = true
+	return changed
 
 
 ## 使っている設定を返す。
@@ -206,3 +232,5 @@ func _apply_level() -> void:
 			else _original_detailed_limit
 		)
 	)
+	# 上限を変えただけでは、いま Detailed の CPU は降格しない。割り当て直して上限を守る。
+	_cpus.refresh_modes()

@@ -42,11 +42,9 @@ func _measure(player_count: int) -> void:
 	var runner := CpuBattleRunner.new(player_count - 1, distribution, null, SEED, 1)
 	var frame: int = 0
 	while runner.get_elapsed_sec() < TIME_LIMIT_SEC and not runner.get_manager().is_finished():
-		if frame % FRAMES_PER_DROP == 0:
-			for human in runner.get_human_players():
-				if human.alive and human.session != null and not human.session.is_over():
-					human.session.hard_drop()
-		runner.step(FRAME_DELTA)
+		# Human の操作も同じフレームの負荷として測る。
+		var drops: bool = frame % FRAMES_PER_DROP == 0
+		runner.step(FRAME_DELTA, _hard_drop_humans.bind(runner) if drops else Callable())
 		frame += 1
 	runner.run(runner.get_elapsed_sec())
 
@@ -65,3 +63,9 @@ func _measure(player_count: int) -> void:
 		)
 	)
 	runner.dispose()
+
+
+func _hard_drop_humans(runner: CpuBattleRunner) -> void:
+	for human in runner.get_human_players():
+		if human.alive and human.session != null and not human.session.is_over():
+			human.session.hard_drop()

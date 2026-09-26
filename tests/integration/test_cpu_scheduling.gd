@@ -201,6 +201,46 @@ func test_degradation_follows_the_priority_order() -> void:
 	)
 
 
+func test_detailed_level_demotes_cpus_already_running_detailed() -> void:
+	# 上限を下げるだけでは、いま Detailed の CPU は降格しない。割り当て直して上限を守る。
+	var runner: CpuBattleRunner = _new_battle(10)
+	var cpus: CpuManager = runner.get_cpu_manager()
+	cpus.set_detailed_limit(2)
+	for player_id in cpus.get_registered_ids().slice(0, 2):
+		cpus.promote(player_id, "test")
+	var scheduler: CpuScheduler = runner.enable_scheduling()
+	assert_eq(cpus.get_detailed_count(), 2, "はじめは 2 体が Detailed")
+
+	scheduler.set_level(CpuSchedulePolicy.Level.DETAILED)
+
+	assert_lte(
+		cpus.get_detailed_count(),
+		scheduler.get_policy().degraded_detailed_limit,
+		"Detailed の数が下げた上限に収まる"
+	)
+
+
+func test_replaced_profiles_become_the_new_baseline() -> void:
+	# assign_profiles() で差し替えた後に段階を戻したら、差し替えた Profile の値へ戻す。
+	var runner: CpuBattleRunner = _new_battle(4)
+	var scheduler: CpuScheduler = runner.enable_scheduling()
+	var profiles: Array[CpuProfile] = []
+	for _index in range(3):
+		var replaced := CpuProfile.create_default()
+		replaced.lookahead = 1
+		replaced.beam_width = 33
+		profiles.append(replaced)
+	runner.assign_profiles(profiles)
+
+	scheduler.set_level(CpuSchedulePolicy.Level.BEAM)
+	assert_eq(profiles[0].lookahead, 0, "差し替えた Profile にも削減が効く")
+	scheduler.set_level(CpuSchedulePolicy.Level.NONE)
+
+	for profile in profiles:
+		assert_eq(profile.lookahead, 1, "Lookahead は差し替えた値へ戻る")
+		assert_eq(profile.beam_width, 33, "Beam Width も差し替えた値へ戻る")
+
+
 func test_degradation_recovers_when_the_load_drops() -> void:
 	var runner: CpuBattleRunner = _new_battle(30)
 	var scheduler: CpuScheduler = runner.enable_scheduling()
