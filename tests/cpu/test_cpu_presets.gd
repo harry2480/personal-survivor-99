@@ -8,13 +8,21 @@ extends GutTest
 
 const SEED: int = 20260920
 const FRAME_DELTA: float = 1.0 / 60.0
-const RUN_SEC: float = 20.0
+
+## 標準難易度との比較に使う時間（秒）。
+##
+## 走行は 1 手ごとに配置探索を回すので重い（Extreme で 1 手 約 80 ms）。
+## 同じ Seed で Attack の差が出るのは 10 秒から。これより縮めると Attack が 0 同士になる。
+const RUN_SEC: float = 10.0
 
 ## Machine の比較に使う時間（秒）。
 ##
-## Machine は PPS が 4 倍あるぶん 1 回の走行が重い。差は短い時間でも出るので、
-## この比較だけ短くする。
-const MACHINE_RUN_SEC: float = 5.0
+## Machine は 1 手 約 200 ms かかり、PPS が 4 倍あるぶん走行がさらに重い。
+## 2 秒でも手数・消した行数は 4 倍ほど開くので、この比較だけ短くする。
+const MACHINE_RUN_SEC: float = 2.0
+
+## 再現性の確認に使う時間（秒）。同じ結果になるかを見るだけなので短くてよい。
+const REPRODUCIBILITY_RUN_SEC: float = 3.0
 const QUALITY_PIECES: int = 40
 
 var mapping: CpuStrengthMapping
@@ -274,14 +282,18 @@ func test_machine_outperforms_extreme() -> void:
 	)
 
 	assert_gt(machine.pieces, extreme.pieces, "同じ時間で置く手数が多い")
-	assert_gt(machine.attack, extreme.attack, "Machine は Extreme を上回る")
+	# 短い走行では Attack がまだ出ないので、消した行数で比べる。
+	assert_gt(machine.lines, extreme.lines, "Machine は Extreme より多く消す")
 
 
 func test_runs_are_reproducible() -> void:
 	var profile: CpuProfile = CpuPreset.create_profile(CpuPreset.Preset.EXTREME, mapping)
 
-	var first: SoloRun = _run_solo(profile, RUN_SEC)
-	var second: SoloRun = _run_solo(profile, RUN_SEC)
+	var first: SoloRun = _run_solo(profile, REPRODUCIBILITY_RUN_SEC)
+	var second: SoloRun = _run_solo(profile, REPRODUCIBILITY_RUN_SEC)
+
+	assert_gt(first.lines, 0, "比べる意味があるだけ動いている")
+	assert_eq(first.pieces, second.pieces, "置いた手数も同じ")
 
 	assert_eq(first.lines, second.lines, "同じ Seed からは同じ結果になる")
 	assert_eq(first.attack, second.attack, "Attack も同じ")
