@@ -46,6 +46,13 @@ var danger_level: DangerLevel.Level = DangerLevel.Level.SAFE
 ## Lightweight Simulation の Player（Phase 5）では null のままにする。
 var session: PuzzleSession = null
 
+## 盤面を進めるかどうか（要件定義 §80〜§83）。
+##
+## Lightweight Simulation の CPU は盤面を使わない。使わない盤面を毎フレーム
+## 進めると、それだけで時間を食う（#55 の計測で 1 フレーム 2.3 ms）。
+## 切り替えは [CpuManager] が行う。
+var simulates_board: bool = true
+
 
 static func create(id: int, type: PlayerType.Type) -> BattlePlayerState:
 	var state := BattlePlayerState.new()

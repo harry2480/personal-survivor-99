@@ -19,6 +19,11 @@ signal target_changed(player_id: int, previous_target: int, current_target: int)
 
 var _manager: BattleManager
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+# 攻撃対象になりうる Player の控え。99 人ぶんを毎回作り直すと重いので
+# （#55 の計測で 1 フレーム 4.1 ms、全体の 62%）、1 巡につき 1 回だけ作る。
+var _targetable: Array[BattlePlayerState] = []
+# 控えの中での位置。自分を飛ばして数えるときに使う（毎回探すと O(N) になる）。
+var _targetable_index: Dictionary = {}
 var _counter_tie_break: TargetMode.CounterTieBreak = TargetMode.CounterTieBreak.MOST_DANGEROUS
 var _manual_targets: Dictionary = {}
 
@@ -87,7 +92,19 @@ func update_target(player_id: int) -> int:
 	if player == null:
 		return TargetMode.NO_TARGET
 
-	var next_target: int = select_target(player)
+	_refresh_targetable()
+	return _update_target_with_cache(player)
+
+
+## Target を選ぶ。[member BattlePlayerState.current_target] は変更しない。
+func select_target(player: BattlePlayerState) -> int:
+	_refresh_targetable()
+	return _select_with_cache(player)
+
+
+# 控えを使って Target を選び直す。
+func _update_target_with_cache(player: BattlePlayerState) -> int:
+	var next_target: int = _select_with_cache(player)
 	if next_target == player.current_target:
 		return next_target
 
@@ -98,14 +115,18 @@ func update_target(player_id: int) -> int:
 
 
 ## 全 Player の Target を選び直す。
+##
+## 候補の一覧は 1 回だけ作って使い回す。選び方（乱数の引き方・同点の崩し方）は
+## 1 人ずつ作っていたときと同じなので、結果は変わらない（#55 の制約）。
 func update_all_targets() -> void:
-	for player in _manager.get_alive_players():
-		update_target(player.player_id)
+	_refresh_targetable()
+	for player in _manager.get_players():
+		if player.alive:
+			_update_target_with_cache(player)
 
 
-## Target を選ぶ。[member BattlePlayerState.current_target] は変更しない。
-func select_target(player: BattlePlayerState) -> int:
-	# 安全性の条件（要件定義 §53）をここで先に通す。
+# 控えから Target を選ぶ。安全性の条件（要件定義 §53）はここで先に通す。
+func _select_with_cache(player: BattlePlayerState) -> int:
 	if not _can_select(player):
 		return TargetMode.NO_TARGET
 
@@ -114,11 +135,39 @@ func select_target(player: BattlePlayerState) -> int:
 	if manual != TargetMode.NO_TARGET:
 		return manual
 
-	var candidates: Array[BattlePlayerState] = get_candidates(player)
-	if candidates.is_empty():
+	if _candidate_count(player) <= 0:
 		return TargetMode.NO_TARGET
 
-	return _select_by_mode(player, candidates)
+	return _select_by_mode(player)
+
+
+# 攻撃対象になりうる Player を控える。
+func _refresh_targetable() -> void:
+	_targetable.clear()
+	_targetable_index.clear()
+	for other in _manager.get_players():
+		if other.is_targetable():
+			_targetable_index[other.player_id] = _targetable.size()
+			_targetable.append(other)
+
+
+# その Player から見た候補の数（控えから自分を除いた数）。
+func _candidate_count(player: BattlePlayerState) -> int:
+	var count: int = _targetable.size()
+	return count - 1 if player.is_targetable() else count
+
+
+# 控えの index 番目（自分を飛ばした数え方）を返す。
+#
+# 自分より後ろを指していれば 1 つずらす。1 人ずつ候補配列を作っていたときと
+# 同じ並びになるので、同じ乱数から同じ相手が選ばれる。
+func _candidate_at(player: BattlePlayerState, index: int) -> BattlePlayerState:
+	if index < 0:
+		return null
+
+	var self_index: int = _targetable_index.get(player.player_id, -1)
+	var position: int = index + 1 if self_index >= 0 and index >= self_index else index
+	return _targetable[position] if position < _targetable.size() else null
 
 
 # 選択そのものを行える状態かを返す（要件定義 §53）。
@@ -141,15 +190,15 @@ func _resolve_manual_target(player: BattlePlayerState) -> int:
 	return TargetMode.NO_TARGET
 
 
-func _select_by_mode(player: BattlePlayerState, candidates: Array[BattlePlayerState]) -> int:
+func _select_by_mode(player: BattlePlayerState) -> int:
 	match player.target_mode:
 		TargetMode.Mode.KO:
-			return _select_most_dangerous(candidates)
+			return _select_most_dangerous(player)
 		TargetMode.Mode.BADGE:
-			return _select_most_badges(candidates)
+			return _select_most_badges(player)
 		TargetMode.Mode.COUNTER:
-			return _select_counter(player, candidates)
-	return _select_random(candidates)
+			return _select_counter(player)
+	return _select_random(player)
 
 
 ## 攻撃対象になりうる Player を返す（要件定義 §53）。
@@ -187,47 +236,65 @@ func _is_valid_target(player: BattlePlayerState, target_id: int) -> bool:
 	return target != null and target.is_targetable()
 
 
-func _select_random(candidates: Array[BattlePlayerState]) -> int:
-	return candidates[_rng.randi_range(0, candidates.size() - 1)].player_id
+func _select_random(player: BattlePlayerState) -> int:
+	var index: int = _rng.randi_range(0, _candidate_count(player) - 1)
+	var chosen: BattlePlayerState = _candidate_at(player, index)
+	return chosen.player_id if chosen != null else TargetMode.NO_TARGET
 
 
-func _select_most_dangerous(candidates: Array[BattlePlayerState]) -> int:
-	var best: BattlePlayerState = candidates[0]
-	for candidate in candidates:
-		if candidate.danger_level > best.danger_level:
+func _select_most_dangerous(player: BattlePlayerState) -> int:
+	var best: BattlePlayerState = null
+	for candidate in _targetable:
+		if candidate.player_id == player.player_id:
+			continue
+		if best == null or candidate.danger_level > best.danger_level:
 			best = candidate
 		elif candidate.danger_level == best.danger_level and candidate.player_id < best.player_id:
 			# 同じ危険度なら ID の小さい方。選択を決定論的にするため。
 			best = candidate
-	return best.player_id
+	return best.player_id if best != null else TargetMode.NO_TARGET
 
 
-func _select_most_badges(candidates: Array[BattlePlayerState]) -> int:
-	var best: BattlePlayerState = candidates[0]
-	for candidate in candidates:
-		if candidate.attack_points > best.attack_points:
+func _select_most_badges(player: BattlePlayerState) -> int:
+	var best: BattlePlayerState = null
+	for candidate in _targetable:
+		if candidate.player_id == player.player_id:
+			continue
+		if best == null or candidate.attack_points > best.attack_points:
 			best = candidate
 		elif candidate.attack_points == best.attack_points and candidate.player_id < best.player_id:
 			best = candidate
-	return best.player_id
+	return best.player_id if best != null else TargetMode.NO_TARGET
 
 
-func _select_counter(player: BattlePlayerState, candidates: Array[BattlePlayerState]) -> int:
+func _select_counter(player: BattlePlayerState) -> int:
 	var attackers: Array[BattlePlayerState] = []
-	for candidate in candidates:
+	for candidate in _targetable:
+		if candidate.player_id == player.player_id:
+			continue
 		if candidate.current_target == player.player_id:
 			attackers.append(candidate)
 
 	# 誰にも狙われていなければ Random へ落とす。
 	if attackers.is_empty():
-		return _select_random(candidates)
+		return _select_random(player)
 
 	match _counter_tie_break:
 		TargetMode.CounterTieBreak.MOST_DANGEROUS:
-			return _select_most_dangerous(attackers)
+			return _select_most_dangerous_of(attackers)
 		TargetMode.CounterTieBreak.LOWEST_ID:
 			return _select_lowest_id(attackers)
-	return _select_random(attackers)
+	return attackers[_rng.randi_range(0, attackers.size() - 1)].player_id
+
+
+func _select_most_dangerous_of(candidates: Array[BattlePlayerState]) -> int:
+	var best: BattlePlayerState = candidates[0]
+	for candidate in candidates:
+		if candidate.danger_level > best.danger_level:
+			best = candidate
+		elif candidate.danger_level == best.danger_level and candidate.player_id < best.player_id:
+			best = candidate
+	return best.player_id
 
 
 func _select_lowest_id(candidates: Array[BattlePlayerState]) -> int:
