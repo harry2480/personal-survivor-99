@@ -56,17 +56,21 @@ func _new_battle(player_count: int) -> CpuBattleRunner:
 func _run(runner: CpuBattleRunner) -> bool:
 	var frame: int = 0
 	while runner.get_elapsed_sec() < TIME_LIMIT_SEC and not runner.get_manager().is_finished():
-		if frame % FRAMES_PER_DROP == 0:
-			for human in runner.get_human_players():
-				if human.alive and human.session != null and not human.session.is_over():
-					human.session.hard_drop()
-		runner.step(FRAME_DELTA)
+		# Human の操作も同じフレームの負荷として測る（フレーム予算の確認に効く）。
+		var drops: bool = frame % FRAMES_PER_DROP == 0
+		runner.step(FRAME_DELTA, _hard_drop_humans.bind(runner) if drops else Callable())
 		frame += 1
 
 	if not runner.get_manager().is_finished():
 		# 時間切れは Runner 側の畳み込みに任せる（同じ経路を通す）。
 		runner.run(runner.get_elapsed_sec())
 	return runner.get_manager().is_finished()
+
+
+func _hard_drop_humans(runner: CpuBattleRunner) -> void:
+	for human in runner.get_human_players():
+		if human.alive and human.session != null and not human.session.is_over():
+			human.session.hard_drop()
 
 
 func _assert_ranks_are_consistent(runner: CpuBattleRunner, player_count: int) -> void:
@@ -176,6 +180,74 @@ func test_simulation_keeps_the_frame_budget() -> void:
 	var runner: CpuBattleRunner = _run_scaling_case(99)
 
 	assert_lt(runner.get_average_frame_msec(), 16.6, "99 人でも 1 フレームの予算に収まる")
+
+
+# --- Human を混ぜた Runner --------------------------------------------------
+
+
+func _small_battle() -> CpuBattleRunner:
+	var runner := CpuBattleRunner.new(2, _distribution(), null, SEED, 1)
+	runners.append(runner)
+	return runner
+
+
+func test_human_pieces_fall_with_normal_gravity() -> void:
+	# Lightweight の CPU のために Runner のルールは Gravity 0 だが、Human は通常どおり落ちる。
+	var runner: CpuBattleRunner = _small_battle()
+	var human: BattlePlayerState = runner.get_human_players()[0]
+	var start_y: int = human.session.get_active_piece().position.y
+
+	for _frame in range(120):
+		runner.step(FRAME_DELTA)
+
+	assert_gt(human.session.get_active_piece().position.y, start_y, "操作しなくてもピースが落ちる")
+
+
+func test_human_garbage_is_attributed_when_it_lands() -> void:
+	# 送った時点ではなく、Human の盤面へ実際に積まれた時点で KO 帰属を記録する。
+	var runner: CpuBattleRunner = _small_battle()
+	var human: BattlePlayerState = runner.get_human_players()[0]
+	var source: BattlePlayerState = runner.get_manager().get_player(human.player_id + 1)
+	source.current_target = human.player_id
+
+	runner._send_attack(source.player_id, 2)
+	assert_eq(runner._attribution.get_history(human.player_id).size(), 0, "送っただけでは記録しない")
+
+	var drops: Callable = _hard_drop_humans.bind(runner)
+	for frame in range(int(3.0 / FRAME_DELTA)):
+		runner.step(FRAME_DELTA, drops if frame % FRAMES_PER_DROP == 0 else Callable())
+
+	var from_source: int = 0
+	for application in runner._attribution.get_history(human.player_id):
+		if application.source_player_id == source.player_id:
+			from_source += application.line_count
+	assert_gt(from_source, 0, "積まれた行が送り手に帰属する")
+
+
+func test_human_elimination_is_not_reported_as_a_cpu() -> void:
+	var runner: CpuBattleRunner = _small_battle()
+	var human: BattlePlayerState = runner.get_human_players()[0]
+	var reported: Array = []
+	runner.cpu_eliminated.connect(
+		func(player_id: int, _rank: int) -> void: reported.append(player_id)
+	)
+
+	runner.get_manager().eliminate_player(human.player_id)
+
+	assert_false(human.player_id in reported, "Human の脱落を CPU の脱落として知らせない")
+
+
+func test_frame_time_includes_the_human_input() -> void:
+	# Human の操作も同じフレームの負荷として測る。重い操作を渡すと Frame Time に出る。
+	var runner: CpuBattleRunner = _small_battle()
+	var heavy_input: Callable = func() -> void:
+		var until: int = Time.get_ticks_usec() + 3000
+		while Time.get_ticks_usec() < until:
+			pass
+
+	runner.step(FRAME_DELTA, heavy_input)
+
+	assert_gte(runner.get_max_frame_msec(), 3.0, "操作にかかった時間もフレームに入る")
 
 
 # --- 再現性（要件定義 §110） -------------------------------------------------
