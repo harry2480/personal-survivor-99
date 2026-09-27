@@ -247,8 +247,9 @@ func _on_battle_finished() -> void:
 	var won: bool = viewer != null and viewer.alive
 	if _music != null:
 		_music.play_result(won)
-	if _audio != null:
-		_audio.play(AudioManager.Event.VICTORY if won else AudioManager.Event.DEFEAT)
+	# Defeat の SE は自分の KO の時点で AudioManager.bind_battle が鳴らしている。
+	if _audio != null and won:
+		_audio.play(AudioManager.Event.VICTORY)
 
 	SceneRouter.finish_battle()
 

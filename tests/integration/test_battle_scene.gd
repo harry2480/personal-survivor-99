@@ -90,3 +90,19 @@ func test_selecting_an_opponent_sets_the_manual_target() -> void:
 		target_id,
 		"選んだ相手が Manual Target になる（要件定義 §52）"
 	)
+
+
+func test_defeat_sound_plays_once_when_the_viewer_loses() -> void:
+	# 自分の KO で Defeat が鳴る。決着の処理で重ねて鳴らさない（#53）。
+	SceneRouter.current_state = GameState.State.PLAYING
+	var scene: Node = _new_battle_scene()
+	await wait_frames(3)
+	var audio: AudioManager = scene.get_audio_manager()
+
+	scene.get_runner().get_manager().eliminate_player(scene.VIEWER_ID)
+	audio._process(AudioManager.THROTTLE_SEC * 2.0)
+	scene._on_battle_finished()
+
+	assert_eq(audio.get_played_count(AudioManager.Event.DEFEAT), 1, "Defeat は 1 回だけ")
+	assert_eq(audio.get_played_count(AudioManager.Event.VICTORY), 0, "負けたら Victory は鳴らない")
+	SceneRouter.current_state = GameState.State.MAIN_MENU
