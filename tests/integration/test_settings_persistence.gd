@@ -6,9 +6,11 @@ extends GutTest
 ## 設定がゲーム側へ効くことを見る（#52 の完了条件）。
 
 const SETTINGS_SCENE := preload("res://scenes/settings/settings.tscn")
+const SETTINGS_SCRIPT := preload("res://scenes/settings/settings.gd")
 const TEST_DIR: String = "user://test_settings/"
 
 var store: SettingsStore
+var _original_settings: UserSettings
 
 
 func before_each() -> void:
@@ -16,11 +18,28 @@ func before_each() -> void:
 	store = SettingsStore.new(TEST_DIR)
 	store.delete_document(SettingsStore.SETTINGS_DOCUMENT)
 	store.delete_document(SettingsStore.STATISTICS_DOCUMENT)
+	# Settings 画面が本物の user://settings.json を書き換えないようにする。
+	_original_settings = SceneRouter.get_user_settings()
+	SceneRouter.settings_store = store
 
 
 func after_each() -> void:
+	_free_settings_screens()
+	SceneRouter.settings_store = SettingsStore.new()
+	SceneRouter.set_user_settings(_original_settings)
 	store.delete_document(SettingsStore.SETTINGS_DOCUMENT)
 	store.delete_document(SettingsStore.STATISTICS_DOCUMENT)
+
+
+# 残っている Settings 画面を、設定を戻す前に消す。
+#
+# GUT は add_child_autofree() したノードを after_each() の後に解放する。そのままだと
+# Settings の _exit_tree() の保存が戻したあとに走り、SceneRouter の設定と
+# テスト用の保存ファイルを書き戻してしまう。
+func _free_settings_screens() -> void:
+	for node in get_tree().root.find_children("*", "Control", true, false):
+		if node.get_script() == SETTINGS_SCRIPT and is_instance_valid(node):
+			node.free()
 
 
 func _write_raw(document: String, text: String) -> void:
@@ -236,3 +255,50 @@ func test_settings_screen_saves_on_close() -> void:
 
 	var reloaded: UserSettings = screen.get_store().load_settings()
 	assert_almost_eq(reloaded.master_volume, 0.11, 0.0001, "保存した値が残る")
+
+
+func test_settings_screen_uses_the_router_store() -> void:
+	var screen: Control = SETTINGS_SCENE.instantiate()
+	add_child_autofree(screen)
+	await wait_frames(1)
+
+	assert_same(screen.get_store(), SceneRouter.settings_store, "保存先は 1 か所（要件定義 §98）")
+
+
+func test_cpu_difficulty_in_settings_becomes_the_next_battle_default() -> void:
+	var settings := UserSettings.create_default()
+	settings.cpu_settings.preset = CpuPreset.Preset.HARD
+
+	SceneRouter.set_user_settings(settings)
+
+	assert_eq(
+		SceneRouter.get_battle_setup().cpu_settings.preset,
+		CpuPreset.Preset.HARD,
+		"Settings の CPU 難易度が次の Battle に使われる"
+	)
+	assert_ne(
+		SceneRouter.get_battle_setup().cpu_settings,
+		settings.cpu_settings,
+		"Main Menu で変えても保存済みの設定は書き換わらない（複製を渡す）"
+	)
+
+
+func test_opening_the_screen_keeps_every_binding() -> void:
+	var before: int = _count_joypad_buttons(&"hold")
+	var screen: Control = SETTINGS_SCENE.instantiate()
+	add_child_autofree(screen)
+	await wait_frames(1)
+
+	screen.save()
+	SettingsApplier.apply_input(store.load_settings())
+
+	assert_eq(before, 2, "前提: hold には Controller の割り当てが 2 つある")
+	assert_eq(_count_joypad_buttons(&"hold"), before, "開いて保存しても 2 つ目が消えない")
+
+
+func _count_joypad_buttons(action: StringName) -> int:
+	var count: int = 0
+	for event in InputMap.action_get_events(action):
+		if event is InputEventJoypadButton:
+			count += 1
+	return count
