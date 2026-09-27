@@ -44,6 +44,9 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Settings を開いている間は、下の Main Menu で Play を始めない。
+	if SceneRouter.is_settings_open():
+		return
 	if event.is_action_pressed(START_ACTION, false, true):
 		get_viewport().set_input_as_handled()
 		_on_play_pressed()
@@ -101,8 +104,8 @@ func _on_play_pressed() -> void:
 
 
 func _on_settings_pressed() -> void:
-	# Settings 画面の中身は #52。ここでは遷移だけ用意しておく。
-	get_tree().change_scene_to_file("res://scenes/settings/settings.tscn")
+	# Settings の中身は #52。状態は MAIN_MENU のまま、この画面の上に重ねる。
+	SceneRouter.open_settings(self)
 
 
 func _on_quit_pressed() -> void:

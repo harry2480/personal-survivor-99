@@ -162,10 +162,27 @@ func _on_pause_action(action: PauseMenu.Action) -> void:
 		PauseMenu.Action.RESTART:
 			SceneRouter.restart_battle()
 		PauseMenu.Action.SETTINGS:
-			# Settings の中身は #52。ここでは開く口だけ用意しておく。
-			get_tree().change_scene_to_file("res://scenes/settings/settings.tscn")
+			_open_settings()
 		PauseMenu.Action.QUIT_TO_MENU:
 			SceneRouter.quit_to_menu()
+
+
+## Settings を Battle の上に重ねて開く（要件定義 §96）。
+##
+## Scene を切り替えると Battle が破棄されるので、Pause したまま重ねる。
+## 閉じたら Pause メニューへ戻る。
+func _open_settings() -> void:
+	var overlay: Node = SceneRouter.open_settings(self)
+	if overlay == null:
+		return
+	_pause_menu.visible = false
+	if not overlay.tree_exited.is_connected(_on_settings_closed):
+		overlay.tree_exited.connect(_on_settings_closed)
+
+
+func _on_settings_closed() -> void:
+	if _pause_menu != null and is_inside_tree():
+		_pause_menu.visible = _paused
 
 
 func _on_battle_finished() -> void:
@@ -190,6 +207,10 @@ func _on_opponent_selected(player_id: int) -> void:
 
 
 func _on_command_pressed(command: GameCommand.Command) -> void:
+	# Settings を開いている間は、下の Battle へ操作を渡さない。
+	if SceneRouter.is_settings_open():
+		return
+
 	var session: PuzzleSession = _viewer_session()
 	if session == null:
 		return
