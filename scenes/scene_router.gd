@@ -53,6 +53,7 @@ var settings_store: SettingsStore = SettingsStore.new()
 var _current_scene_path: String = ""
 var _battle_setup: BattleSetup = BattleSetup.create_default()
 var _user_settings: UserSettings = null
+var _last_outcome: BattleOutcome = BattleOutcome.create_empty()
 var _settings_overlay: Node
 
 
@@ -136,6 +137,11 @@ func set_battle_paused(paused: bool) -> void:
 		change_state(GameState.State.PLAYING)
 
 
+## 直前の Battle の結果を返す（Result 画面が読む。要件定義 §99）。
+func get_last_outcome() -> BattleOutcome:
+	return _last_outcome
+
+
 ## Settings を [param host] の上に重ねて開く（要件定義 §94 / §96 / §107）。
 ##
 ## Main Menu からも Pause からも使う。[member current_state] と今の Scene は
@@ -171,7 +177,11 @@ func is_settings_open() -> bool:
 
 
 ## Battle の決着を伝える（要件定義 §109）。
-func finish_battle() -> void:
+##
+## [param outcome] を Result 画面が表示する。渡さなければ空の結果にする
+## （前の Battle の結果を Statistics へ二重に足さないように）。
+func finish_battle(outcome: BattleOutcome = null) -> void:
+	_last_outcome = outcome if outcome != null else BattleOutcome.create_empty()
 	change_state(GameState.State.FINISHED)
 	change_state(GameState.State.RESULT)
 
