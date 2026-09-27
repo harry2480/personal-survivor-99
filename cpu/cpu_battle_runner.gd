@@ -21,6 +21,12 @@ extends RefCounted
 ## CPU が脱落した。
 signal cpu_eliminated(player_id: int, rank: int)
 
+## Attack を Garbage として送った（[signal GarbageRouter.garbage_routed] と同じ形。要件定義 §112）。
+signal garbage_routed(source_player_id: int, target_player_id: int, line_count: int)
+
+## Garbage が盤面へ積まれた（[signal GarbageRouter.garbage_received] と同じ形。要件定義 §112）。
+signal garbage_received(victim_player_id: int, source_player_id: int, line_count: int)
+
 ## 1 フレームぶんの時間（秒）。
 const DEFAULT_FRAME_DELTA: float = 1.0 / 60.0
 
@@ -117,8 +123,7 @@ func _init(
 	_register_cpus(cpu_count, distribution, mapping, battle_seed)
 	# Human は普通のルール（Gravity あり）で遊ぶ。CPU 側の都合で止めた
 	# Gravity を人間へ持ち込まない。
-	if human_count > 0:
-		_apply_human_rules(human_rules if human_rules != null else GameRules.create_default())
+	_give_humans_normal_rules(human_rules)
 	_connect_humans()
 	_targets.update_all_targets()
 
@@ -129,7 +134,7 @@ func dispose() -> void:
 		_manager.player_eliminated.disconnect(_on_eliminated)
 	for entry in _human_connections:
 		var session: PuzzleSession = entry[0]
-		session.attack_generated.disconnect(entry[1])
+		session.disconnect(entry[1], entry[2])
 	_human_connections.clear()
 	_ko.dispose()
 
@@ -187,6 +192,10 @@ func assign_profiles(profiles: Array[CpuProfile]) -> void:
 		_strengths[player.player_id] = profiles[index].strength
 		index += 1
 
+	# 分散していれば、差し替えた Profile を基準値として取り直す。
+	if _scheduler != null:
+		_scheduler.sync_profiles()
+
 
 ## 決着まで進める。決着したら [code]true[/code]。
 ##
@@ -219,11 +228,15 @@ func run(
 ## 1 フレームぶん進める。
 ##
 ## 1 フレームにかかった実時間も測る（#46 の完了条件）。
-func step(delta_sec: float) -> void:
+## [param human_input] を渡すと、計測を始めてから最初に呼ぶ。Human の操作
+## （Hard Drop の Line Clear や Attack 計算）も同じフレームの負荷として測るため。
+func step(delta_sec: float, human_input: Callable = Callable()) -> void:
 	if _manager.is_finished():
 		return
 
 	var started_usec: int = Time.get_ticks_usec()
+	if human_input.is_valid():
+		human_input.call()
 
 	_elapsed_sec += maxf(0.0, delta_sec)
 	_manager.update(delta_sec)
@@ -340,29 +353,47 @@ func _sync_battle_state() -> void:
 		player.incoming_garbage = indicators.incoming_garbage
 
 
-# Human の盤面を、人間向けのルールで作り直す。
-func _apply_human_rules(rules: GameRules) -> void:
+# Human の盤面が出した Attack も同じ経路へ載せる（要件定義 §40）。
+# Human のセッションを、Gravity を止めていない通常のルールで作り直す。
+#
+# Lightweight の CPU のために Runner のルールは Gravity 0 にしてあるが、Human は
+# 実際の盤面で遊ぶので、通常どおりピースが落ちる必要がある。Seed は BattleManager と
+# 同じものを使うので、Piece 列は変わらない。
+#
+# [param rules] はユーザー設定（DAS / ARR / Soft Drop）を反映したルール（要件定義 §97）。
+# 渡されなければ既定のルールを使う。
+func _give_humans_normal_rules(rules: GameRules = null) -> void:
+	var human_rules: GameRules = rules if rules != null else GameRules.create_default()
 	for player in _manager.get_players():
 		if not player.is_human():
 			continue
-		var player_seed: int = _manager.get_seed_for(player.player_id)
-		var session := PuzzleSession.new(rules, PieceRandomizer.new(player_seed), _balance)
+		var player_seed: int = _manager.get_player_seed(player.player_id)
+		var session := PuzzleSession.new(human_rules, PieceRandomizer.new(player_seed), _balance)
 		session.start(player_seed)
 		player.attach_session(session)
 
 
-# Human の盤面が出した Attack も同じ経路へ載せる（要件定義 §40）。
 func _connect_humans() -> void:
 	for player in _manager.get_players():
 		if not player.is_human() or player.session == null:
 			continue
 		var on_attack: Callable = _on_human_attack.bind(player.player_id)
 		player.session.attack_generated.connect(on_attack)
-		_human_connections.append([player.session, on_attack])
+		_human_connections.append([player.session, "attack_generated", on_attack])
+		var on_applied: Callable = _on_human_garbage_applied.bind(player.player_id)
+		player.session.garbage_event_applied.connect(on_applied)
+		_human_connections.append([player.session, "garbage_event_applied", on_applied])
 
 
 func _on_human_attack(amount: int, _context: AttackContext, source_id: int) -> void:
 	_send_attack(source_id, amount)
+
+
+# Human の盤面へ Garbage が実際に積まれたときに KO 帰属を記録する（要件定義 §56）。
+# 相殺で消えた行は積まれないので、ここには来ない。
+func _on_human_garbage_applied(source_id: int, line_count: int, victim_id: int) -> void:
+	_attribution.record_application(victim_id, source_id, _elapsed_sec, line_count)
+	garbage_received.emit(victim_id, source_id, line_count)
 
 
 func _record_frame_time(elapsed_usec: int) -> void:
@@ -391,15 +422,17 @@ func _send_attack(source_id: int, line_count: int) -> void:
 	# Attack Multiplier は Battle Layer の規則（要件定義 §57）。CPU 側で
 	# 作り直さず、Battle が持っている倍率をそのまま掛ける。
 	var sent: int = MultiplierSystem.apply(line_count, source)
+	garbage_routed.emit(source_id, target.player_id, sent)
 
 	if target.is_human():
-		# Human の盤面へ積まれる時点は Runner から見えないので、送った時点で記録する。
+		# KO の帰属は、盤面へ実際に積まれた時点で記録する（_on_human_garbage_applied）。
 		target.session.receive_garbage_lines(sent, source_id)
-		_attribution.record_application(target.player_id, source_id, _elapsed_sec, sent)
 	elif _cpus.get_mode(target.player_id) == CpuManager.Mode.DETAILED:
-		# Detailed も盤面を持つので、Human と同じく送った時点で記録する。
+		# Detailed の盤面は送り手を知らずに Garbage を受ける（CpuManager.receive_garbage）ので、
+		# 積まれた時点を送り手ごとに追えない。送った時点で記録する。
 		_cpus.receive_garbage(target.player_id, sent)
 		_attribution.record_application(target.player_id, source_id, _elapsed_sec, sent)
+		garbage_received.emit(target.player_id, source_id, sent)
 	else:
 		_cpus.receive_garbage(target.player_id, sent)
 		# KO の帰属は、盤面へ実際に積まれた時点で記録する（_attribute_applied_garbage）。
@@ -416,9 +449,22 @@ func _send_attack(source_id: int, line_count: int) -> void:
 func _attribute_applied_garbage() -> void:
 	for victim_id in _pending_garbage:
 		var queue: Array = _pending_garbage[victim_id]
+		if _cpus.get_mode(victim_id) == CpuManager.Mode.DETAILED:
+			# Detailed へ昇格すると、受信待ちの Garbage は盤面へ移る（CpuManager の昇格処理）。
+			# 以後は積まれた行数が返らないので、残りはここで記録して列を空にする。
+			# 放っておくと、降格したときに古い送り手へ KO が付く。
+			_consume_garbage(queue, _count_lines(queue), victim_id)
+			continue
 		var result: Vector2i = _cpus.take_garbage_result(victim_id)
 		_consume_garbage(queue, result.x, -1)
 		_consume_garbage(queue, result.y, victim_id)
+
+
+func _count_lines(queue: Array) -> int:
+	var total: int = 0
+	for entry in queue:
+		total += entry[1]
+	return total
 
 
 # queue の先頭から line_count 行を取り除く。victim_id が 0 以上なら、取り除いた行を
@@ -430,6 +476,7 @@ func _consume_garbage(queue: Array, line_count: int, victim_id: int) -> void:
 		var lines: int = mini(remaining, entry[1])
 		if victim_id >= 0:
 			_attribution.record_application(victim_id, entry[0], _elapsed_sec, lines)
+			garbage_received.emit(victim_id, entry[0], lines)
 		entry[1] -= lines
 		remaining -= lines
 		if entry[1] <= 0:
@@ -489,4 +536,7 @@ func _find_worst_standing() -> int:
 
 func _record_elimination(player_id: int, rank: int) -> void:
 	_survival_sec[player_id] = _elapsed_sec
-	cpu_eliminated.emit(player_id, rank)
+	# CPU の脱落だけを知らせる。Human の脱落は BattleManager.player_eliminated で分かる。
+	var player: BattlePlayerState = _manager.get_player(player_id)
+	if player != null and not player.is_human():
+		cpu_eliminated.emit(player_id, rank)

@@ -7,15 +7,31 @@ extends Control
 ## この画面は**並べて受け取るだけ**にしてある。
 ##
 ## 変更は即座に反映し、画面を閉じるときに保存する（要件定義 §98）。
+##
+## [SceneRouter] が今の画面（Main Menu / Pause 中の Battle）の上に重ねて開く。
+## 閉じるのも [SceneRouter] を通し、Game State は変えない（要件定義 §107 / §109）。
+
+## 閉じるときに使う Action。
+const CLOSE_ACTION: StringName = &"ui_cancel"
+
+## 変えたときに Audio を反映する項目。
+const AUDIO_KEYS: Array[String] = ["master_volume", "bgm_volume", "se_volume"]
+
+## 変えたときに Video を反映する項目。
+const VIDEO_KEYS: Array[String] = ["fullscreen", "vsync_enabled", "fps_limit"]
+
+## 変えたときに Input を反映する項目。
+const INPUT_KEYS: Array[String] = ["stick_dead_zone"]
 
 ## CPU 難易度の設定も同じ画面から触れる（要件定義 §97 の Gameplay）。
 var _difficulty_panel: CpuDifficultyPanel
-var _store := SettingsStore.new()
+var _store: SettingsStore
 var _settings: UserSettings
 var _controls: Dictionary = {}
 
 
 func _ready() -> void:
+	_store = SceneRouter.settings_store
 	_settings = _store.load_settings()
 
 	var root := VBoxContainer.new()
@@ -33,15 +49,20 @@ func _ready() -> void:
 	_build_input(root)
 
 	var back := Button.new()
+	back.name = "BackButton"
 	back.text = "BACK"
 	back.pressed.connect(close)
 	root.add_child(back)
 
-	SettingsApplier.apply_all(_settings)
-
 
 func _exit_tree() -> void:
 	save()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed(CLOSE_ACTION, false, true):
+		get_viewport().set_input_as_handled()
+		close()
 
 
 ## 表示している設定を返す。
@@ -69,10 +90,10 @@ func save() -> bool:
 	return _store.save_settings(_settings)
 
 
-## 保存して Main Menu へ戻る。
+## 保存して元の画面へ戻る。
 func close() -> void:
 	save()
-	get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn")
+	SceneRouter.close_settings()
 
 
 func _build_gameplay(root: Control) -> void:
@@ -109,18 +130,24 @@ func _build_input(root: Control) -> void:
 	root.add_child(_section_label("INPUT"))
 	_add_slider(root, "stick_dead_zone", "DEAD ZONE", 0.0, 1.0, 0.01, _settings.stick_dead_zone)
 
-	# Keyboard / Controller の割り当ては、いまの内容を読み出して持たせておく。
+	# Keyboard / Controller の割り当ては、件数を出すだけ。
 	# 個別の割り当て直し UI（1 キーずつ取り直す）は Accessibility（§128）の範囲。
-	if _settings.keyboard_bindings.is_empty():
-		_settings.keyboard_bindings = SettingsApplier.read_keyboard_bindings()
-	if _settings.controller_bindings.is_empty():
-		_settings.controller_bindings = SettingsApplier.read_controller_bindings()
+	#
+	# 読み出した割り当ては _settings へ入れない。読み出しは Action ごとに 1 つだけ
+	# なので、保存して反映し直すと 2 つ目以降（hold の Button 10 など）が消える。
+	var keyboard: Dictionary = (
+		_settings.keyboard_bindings
+		if not _settings.keyboard_bindings.is_empty()
+		else SettingsApplier.read_keyboard_bindings()
+	)
+	var controller: Dictionary = (
+		_settings.controller_bindings
+		if not _settings.controller_bindings.is_empty()
+		else SettingsApplier.read_controller_bindings()
+	)
 
 	var label := Label.new()
-	label.text = (
-		"KEYBOARD %d / CONTROLLER %d"
-		% [_settings.keyboard_bindings.size(), _settings.controller_bindings.size()]
-	)
+	label.text = "KEYBOARD %d / CONTROLLER %d" % [keyboard.size(), controller.size()]
 	root.add_child(label)
 
 
@@ -169,5 +196,12 @@ func _on_value_changed(key: String, value: Variant) -> void:
 	else:
 		_settings.set(key, value)
 
-	# 変えたらその場で効かせる（要件定義 §97）。
-	SettingsApplier.apply_all(_settings)
+	# 変えたらその場で効かせる（要件定義 §97）。変えた項目の分だけ反映する。
+	# まとめて反映すると、音量を触るだけでウィンドウの大きさが戻ってしまう。
+	if key in AUDIO_KEYS:
+		SettingsApplier.apply_audio(_settings)
+	elif key in VIDEO_KEYS:
+		SettingsApplier.apply_video(_settings)
+	elif key in INPUT_KEYS:
+		SettingsApplier.apply_input(_settings)
+	# Gameplay（DAS / ARR / Soft Drop / Ghost）は Battle が開始時と Settings を閉じたときに読む。
