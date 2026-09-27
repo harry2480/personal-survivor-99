@@ -137,11 +137,19 @@ func _build_input() -> void:
 
 func _on_opponent_selected(player_id: int) -> void:
 	# Target にするかどうかは Battle Layer が決める（要件定義 §53）。
-	_runner.get_target_manager().set_manual_target(VIEWER_ID, player_id)
+	if not _runner.get_target_manager().set_manual_target(VIEWER_ID, player_id):
+		return
+	# 今の Target を選び直した場合は target_changed が出ないので、HUD を読み直させる。
+	_hud.refresh_target()
 
 
 func _on_command_pressed(command: GameCommand.Command) -> void:
-	var session: PuzzleSession = _viewer_session()
+	if command == GameCommand.Command.PAUSE:
+		set_paused(not _paused)
+		return
+
+	# 止めている間は盤面を動かさない（要件定義 §96）。
+	var session: PuzzleSession = null if _paused else _viewer_session()
 	if session == null:
 		return
 
@@ -160,8 +168,6 @@ func _on_command_pressed(command: GameCommand.Command) -> void:
 			session.rotate(RotationSystem.Direction.CLOCKWISE)
 		GameCommand.Command.HOLD:
 			session.hold()
-		GameCommand.Command.PAUSE:
-			set_paused(not _paused)
 
 
 func _on_command_released(command: GameCommand.Command) -> void:

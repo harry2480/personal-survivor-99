@@ -249,7 +249,7 @@ func test_frame_time_includes_the_human_input() -> void:
 
 	runner.step(FRAME_DELTA, heavy_input)
 
-	assert_gte(runner.get_max_frame_msec(), 3.0, "操作にかかった時間もフレームに入る")
+	assert_gte(runner.get_frame_stats().max_msec, 3.0, "操作にかかった時間もフレームに入る")
 
 
 # --- 再現性（要件定義 §110） -------------------------------------------------
