@@ -6,6 +6,8 @@ extends GutTest
 ## 出ること、Manual Target 用に選べることを見る（#49 の完了条件）。
 
 const GRID := preload("res://ui/opponent/opponent_grid.tscn")
+## 実時間を測るテストを、カバレッジ計測では飛ばすための判定。
+const CoverageGuard = preload("res://tests/coverage_guard.gd")
 const SEED: int = 20260922
 const PLAYER_COUNT: int = 99
 const VIEWER_ID: int = 0
@@ -218,6 +220,9 @@ func test_state_is_not_scanned_every_frame() -> void:
 
 
 func test_refreshing_98_opponents_is_cheap() -> void:
+	# 実時間を測るので、処理が数倍遅くなるカバレッジ計測では意味がなく、飛ばす。
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	# 98 面ぶんの読み直しが 1 フレームの予算（16.6 ms）を食わないこと。
 	var started: int = Time.get_ticks_usec()
 	for _count in range(10):
