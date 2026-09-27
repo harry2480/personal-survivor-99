@@ -96,7 +96,8 @@ func _init(
 	distribution: CpuDistribution = null,
 	mapping: CpuStrengthMapping = null,
 	battle_seed: int = 0,
-	human_count: int = 0
+	human_count: int = 0,
+	human_rules: GameRules = null
 ) -> void:
 	var rules := GameRules.create_default()
 	# Lightweight の CPU は盤面を動かさない。放っておいた盤面が勝手に
@@ -114,7 +115,9 @@ func _init(
 	_manager.player_eliminated.connect(_on_eliminated)
 
 	_register_cpus(cpu_count, distribution, mapping, battle_seed)
-	_give_humans_normal_rules()
+	# Human は普通のルール（Gravity あり）で遊ぶ。CPU 側の都合で止めた
+	# Gravity を人間へ持ち込まない。
+	_give_humans_normal_rules(human_rules)
 	_connect_humans()
 	_targets.update_all_targets()
 
@@ -350,8 +353,11 @@ func _sync_battle_state() -> void:
 # Lightweight の CPU のために Runner のルールは Gravity 0 にしてあるが、Human は
 # 実際の盤面で遊ぶので、通常どおりピースが落ちる必要がある。Seed は BattleManager と
 # 同じものを使うので、Piece 列は変わらない。
-func _give_humans_normal_rules() -> void:
-	var human_rules := GameRules.create_default()
+#
+# [param rules] はユーザー設定（DAS / ARR / Soft Drop）を反映したルール（要件定義 §97）。
+# 渡されなければ既定のルールを使う。
+func _give_humans_normal_rules(rules: GameRules = null) -> void:
+	var human_rules: GameRules = rules if rules != null else GameRules.create_default()
 	for player in _manager.get_players():
 		if not player.is_human():
 			continue

@@ -34,6 +34,7 @@ var _danger_level: DangerLevel.Level = DangerLevel.Level.SAFE
 var _incoming_lines: int = 0
 var _connections: Array = []
 var _cells_dirty: bool = true
+var _ghost_enabled: bool = true
 
 
 func _ready() -> void:
@@ -138,6 +139,17 @@ func get_ghost_cells() -> Array[Vector2i]:
 	return _ghost_cells
 
 
+## Ghost を出すかを切り替える（要件定義 §97 の Ghost 設定）。
+func set_ghost_enabled(enabled: bool) -> void:
+	_ghost_enabled = enabled
+	refresh()
+
+
+## Ghost を出しているかを返す。
+func is_ghost_enabled() -> bool:
+	return _ghost_enabled
+
+
 ## 表示している Danger State を返す（要件定義 §92）。
 func get_danger_level() -> DangerLevel.Level:
 	return _danger_level
@@ -239,7 +251,8 @@ func _read_active_piece() -> void:
 
 	for offset in offsets:
 		_append_visible(_active_cells, piece.position + offset)
-		_append_visible(_ghost_cells, ghost_position + offset)
+		if _ghost_enabled:
+			_append_visible(_ghost_cells, ghost_position + offset)
 
 
 func _append_visible(cells: Array[Vector2i], cell: Vector2i) -> void:

@@ -47,9 +47,38 @@ const ALLOWED_TRANSITIONS: Dictionary = {
 
 var current_state: GameState.State = GameState.State.BOOT
 
+## ユーザー設定の保存先（要件定義 §98）。テストでは別のディレクトリへ差し替える。
+var settings_store: SettingsStore = SettingsStore.new()
+
 var _current_scene_path: String = ""
 var _battle_setup: BattleSetup = BattleSetup.create_default()
+var _user_settings: UserSettings = null
 var _settings_overlay: Node
+
+
+## ユーザー設定を返す（要件定義 §97 / §98）。
+##
+## まだ読んでいなければ、ここで `user://` から読む。読めなければ既定値。
+func get_user_settings() -> UserSettings:
+	if _user_settings == null:
+		_user_settings = settings_store.load_settings()
+		_sync_cpu_settings()
+	return _user_settings
+
+
+## ユーザー設定を差し替える（Settings 画面が保存したあとに呼ぶ）。
+##
+## Settings で選んだ CPU 難易度は、次の Battle の既定にもなる（要件定義 §97）。
+func set_user_settings(settings: UserSettings) -> void:
+	if settings != null:
+		_user_settings = settings
+		_sync_cpu_settings()
+
+
+# 保存してある CPU 難易度を、次の Battle の設定へ写す。
+func _sync_cpu_settings() -> void:
+	if _user_settings != null and _user_settings.cpu_settings != null:
+		_battle_setup.cpu_settings = _user_settings.cpu_settings.duplicate(true)
 
 
 ## その遷移が許されているかを返す（要件定義 §109）。

@@ -36,6 +36,7 @@ var _opponent_grid: OpponentGrid
 var _hud: BattleHud
 var _pause_menu: PauseMenu
 var _setup: BattleSetup
+var _human_rules: GameRules
 var _paused: bool = false
 var _finished: bool = false
 
@@ -100,6 +101,11 @@ func get_setup() -> BattleSetup:
 	return _setup
 
 
+## 自分の盤面が読んでいるルールを返す（ユーザー設定を重ねたもの）。
+func get_human_rules() -> GameRules:
+	return _human_rules
+
+
 func _create_runner() -> CpuBattleRunner:
 	var mapping: Resource = load("res://config/cpu_strength_mapping.tres")
 	var runner := CpuBattleRunner.new(
@@ -107,13 +113,42 @@ func _create_runner() -> CpuBattleRunner:
 		_setup.build_distribution(),
 		mapping if mapping is CpuStrengthMapping else null,
 		_setup.resolve_seed(),
-		1
+		1,
+		_load_human_rules()
 	)
 
 	# CPU の更新は分散する（要件定義 §104 / #47）。
 	var policy: Resource = load("res://config/cpu_scheduling.tres")
 	runner.enable_scheduling(policy if policy is CpuSchedulePolicy else null)
 	return runner
+
+
+# 自分の盤面のルールを作る。config の値に、ユーザー設定（#52）を重ねる。
+#
+# load() が返す Resource は共有されるので、複製してから書き換える。
+func _load_human_rules() -> GameRules:
+	var loaded: Resource = load("res://config/game_rules.tres")
+	_human_rules = loaded.duplicate() if loaded is GameRules else GameRules.create_default()
+	_apply_user_settings()
+	return _human_rules
+
+
+# ユーザー設定（#52）を自分の盤面のルールと表示へ重ねる。
+#
+# Pause 中に Settings を閉じたときも呼ぶ。Session は同じ GameRules を読み続けるので、
+# DAS / ARR / Soft Drop はその場で効く（要件定義 §97）。
+func _apply_user_settings() -> void:
+	var settings: UserSettings = SceneRouter.get_user_settings()
+	if _human_rules != null:
+		SettingsApplier.apply_gameplay(settings, _human_rules)
+	# Dead Zone は Input の設定（要件定義 §97）。Game Core の GameRules には持たせない。
+	InputManager.apply_dead_zone(
+		settings.stick_dead_zone if settings != null else InputManager.DEFAULT_DEAD_ZONE
+	)
+	if _board_panel != null:
+		_board_panel.get_board_view().set_ghost_enabled(
+			settings.ghost_enabled if settings != null else true
+		)
 
 
 func _build_views() -> void:
@@ -134,6 +169,7 @@ func _build_views() -> void:
 	_board_panel.position = MARGIN + Vector2(0.0, 360.0)
 	add_child(_board_panel)
 	_board_panel.bind(viewer.session, viewer)
+	_apply_user_settings()
 
 	_hud = BattleHud.new()
 	_hud.name = "BattleHud"
@@ -181,7 +217,11 @@ func _open_settings() -> void:
 
 
 func _on_settings_closed() -> void:
-	if _pause_menu != null and is_inside_tree():
+	if not is_inside_tree():
+		return
+	# Settings で変えた値を、いまの Battle へ効かせる。
+	_apply_user_settings()
+	if _pause_menu != null:
 		_pause_menu.visible = _paused
 
 

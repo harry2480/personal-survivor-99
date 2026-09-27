@@ -1,8 +1,11 @@
 extends Node
 
-## 起動時の入口。初期化が済み次第 Main Menu へ遷移する。
-## 本格的な Initial Loading（要件定義 §106）は Phase 9 で扱う。
+## 起動時の入口。ユーザー設定を読み込んで反映してから Main Menu へ遷移する。
+##
+## 設定の読み込みで落ちないこと（壊れていても既定値で起動すること）は
+## [SettingsStore] が受け持つ（要件定義 §98 / #52）。
 
 
 func _ready() -> void:
+	SettingsApplier.apply_all(SceneRouter.get_user_settings())
 	SceneRouter.change_state(GameState.State.MAIN_MENU)

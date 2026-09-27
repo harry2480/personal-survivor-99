@@ -104,8 +104,16 @@ func _on_play_pressed() -> void:
 
 
 func _on_settings_pressed() -> void:
-	# Settings の中身は #52。状態は MAIN_MENU のまま、この画面の上に重ねる。
-	SceneRouter.open_settings(self)
+	# 状態は MAIN_MENU のまま、この画面の上に重ねる。
+	var overlay: Node = SceneRouter.open_settings(self)
+	# Settings で変えた CPU 難易度を、閉じたあとの表示へ反映する。
+	if overlay != null and not overlay.tree_exited.is_connected(_on_settings_closed):
+		overlay.tree_exited.connect(_on_settings_closed)
+
+
+func _on_settings_closed() -> void:
+	if is_inside_tree():
+		_load_from_router()
 
 
 func _on_quit_pressed() -> void:
