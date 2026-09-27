@@ -44,9 +44,7 @@ func log_event(event: String, detail: String = "") -> void:
 		return
 
 	var line: String = event if detail.is_empty() else "%s %s" % [event, detail]
-	_lines.append(line)
-	while _lines.size() > MAX_LINES:
-		_lines.remove_at(0)
+	_append(line)
 	print(line)
 
 
@@ -106,7 +104,14 @@ func unbind() -> void:
 ## これは Release でも出す。落ちた理由が分からないほうが困るため。
 func log_fatal(message: String) -> void:
 	push_error("fatal %s" % message)
-	_lines.append("fatal %s" % message)
+	_append("fatal %s" % message)
+
+
+# 上限（MAX_LINES）を守って 1 行足す。古い行から捨てる。
+func _append(line: String) -> void:
+	_lines.append(line)
+	while _lines.size() > MAX_LINES:
+		_lines.remove_at(0)
 
 
 func _connect(source: Object, signal_name: String, handler: Callable) -> void:

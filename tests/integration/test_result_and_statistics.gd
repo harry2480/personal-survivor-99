@@ -320,3 +320,15 @@ func test_logger_keeps_a_bounded_history() -> void:
 		logger.log_event("garbage_send", str(index))
 
 	assert_eq(logger.get_lines().size(), BattleLogger.MAX_LINES, "古い行から捨てる")
+
+
+func test_fatal_errors_keep_a_bounded_history() -> void:
+	# Fatal Error は Release でも記録する。繰り返し起きても増え続けない。
+	var logger := BattleLogger.new()
+	logger.set_enabled(false)
+
+	for index in range(BattleLogger.MAX_LINES + 50):
+		logger.log_fatal(str(index))
+
+	assert_eq(logger.get_lines().size(), BattleLogger.MAX_LINES, "古い行から捨てる")
+	assert_push_error_count(BattleLogger.MAX_LINES + 50, "Fatal Error はエラーとしても出す")
