@@ -178,10 +178,10 @@ func is_settings_open() -> bool:
 
 ## Battle の決着を伝える（要件定義 §109）。
 ##
-## [param outcome] を渡すと Result 画面がそれを表示する。
+## [param outcome] を Result 画面が表示する。渡さなければ空の結果にする
+## （前の Battle の結果を Statistics へ二重に足さないように）。
 func finish_battle(outcome: BattleOutcome = null) -> void:
-	if outcome != null:
-		_last_outcome = outcome
+	_last_outcome = outcome if outcome != null else BattleOutcome.create_empty()
 	change_state(GameState.State.FINISHED)
 	change_state(GameState.State.RESULT)
 

@@ -31,17 +31,18 @@ const ROW_LABELS: Dictionary = {
 
 var _outcome: BattleOutcome
 var _statistics: Statistics
-var _store := SettingsStore.new()
 var _values: Dictionary = {}
 
 
 func _ready() -> void:
 	_outcome = SceneRouter.get_last_outcome()
-	_statistics = Statistics.load_from(_store)
+	# 保存先は Settings と同じ 1 か所（要件定義 §98）。
+	var store: SettingsStore = SceneRouter.settings_store
+	_statistics = Statistics.load_from(store)
 
 	# 通算へ足して保存する（要件定義 §98 / §99）。
 	_statistics.record_battle(_outcome)
-	_statistics.save_to(_store)
+	_statistics.save_to(store)
 
 	_build()
 

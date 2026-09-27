@@ -14,9 +14,12 @@ func before_each() -> void:
 	DirAccess.make_dir_recursive_absolute(TEST_DIR)
 	store = SettingsStore.new(TEST_DIR)
 	store.delete_document(SettingsStore.STATISTICS_DOCUMENT)
+	# Result 画面は SceneRouter の保存先へ書く。本物の記録を汚さないよう差し替える。
+	SceneRouter.settings_store = store
 
 
 func after_each() -> void:
+	SceneRouter.settings_store = SettingsStore.new()
 	store.delete_document(SettingsStore.STATISTICS_DOCUMENT)
 
 
@@ -172,12 +175,30 @@ func test_result_screen_records_the_battle() -> void:
 	SceneRouter.current_state = GameState.State.MAIN_MENU
 	SceneRouter.start_battle()
 	SceneRouter.finish_battle(_outcome(1, 2, 10))
+	# 決着すると SceneRouter が Result 画面を読み込む。その画面が記録する。
+	await wait_frames(2)
+	var screen: Node = get_tree().current_scene
 
+	assert_eq(screen.get_statistics().games_played, 1, "通算へ足し込まれる")
+	assert_eq(Statistics.load_from(store).games_played, 1, "Settings と同じ保存先へ書く（§98）")
+
+	SceneRouter.current_state = GameState.State.MAIN_MENU
+
+
+func test_result_screen_does_not_record_the_previous_battle_again() -> void:
+	SceneRouter.current_state = GameState.State.MAIN_MENU
+	SceneRouter.start_battle()
+	SceneRouter.finish_battle(_outcome(1, 2, 10))
+	await wait_frames(2)
+
+	# 結果を渡さずに決着したとき、前の Battle の結果を足し直さない。
+	SceneRouter.current_state = GameState.State.PLAYING
+	SceneRouter.finish_battle()
 	var screen: Control = RESULT_SCENE.instantiate()
 	add_child_autofree(screen)
 	await wait_frames(2)
 
-	assert_gte(screen.get_statistics().games_played, 1, "通算へ足し込まれる")
+	assert_eq(Statistics.load_from(store).games_played, 1, "前の Battle を二重に数えない")
 
 	SceneRouter.current_state = GameState.State.MAIN_MENU
 
@@ -259,6 +280,27 @@ func test_logger_records_the_required_events() -> void:
 	logger.unbind()
 	router.dispose()
 	ko.dispose()
+
+
+func test_logger_records_garbage_of_the_real_battle() -> void:
+	# 実際の Battle は GarbageRouter を通さず Runner が Garbage を流す（§112）。
+	var runner := CpuBattleRunner.new(9, CpuDistribution.create_default(), null, SEED)
+	var logger := BattleLogger.new()
+	logger.set_enabled(true)
+	logger.bind(runner.get_manager(), runner.get_ko_system(), runner.get_target_manager(), runner)
+
+	var text: String = ""
+	for _frame in range(60 * 120):
+		runner.step(CpuBattleRunner.DEFAULT_FRAME_DELTA)
+		text = "\n".join(logger.get_lines())
+		if text.contains("garbage_send") and text.contains("garbage_apply"):
+			break
+
+	assert_true(text.contains("garbage_send"), "Garbage Send を記録する")
+	assert_true(text.contains("garbage_apply"), "Garbage Apply を記録する")
+
+	logger.unbind()
+	runner.dispose()
 
 
 func test_logger_is_silent_when_disabled() -> void:

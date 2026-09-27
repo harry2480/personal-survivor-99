@@ -51,9 +51,10 @@ func log_event(event: String, detail: String = "") -> void:
 
 
 ## Battle の出来事を購読する（要件定義 §112）。
-func bind(
-	manager: BattleManager, ko: KoSystem, targets: TargetManager, router: GarbageRouter
-) -> void:
+##
+## [param router] は Garbage の送受を知らせるもの。[GarbageRouter] か、自前で
+## Garbage を流す [CpuBattleRunner]（どちらも `garbage_routed` / `garbage_received` を出す）。
+func bind(manager: BattleManager, ko: KoSystem, targets: TargetManager, router: Object) -> void:
 	unbind()
 
 	if manager != null:

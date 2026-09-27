@@ -21,6 +21,12 @@ extends RefCounted
 ## CPU が脱落した。
 signal cpu_eliminated(player_id: int, rank: int)
 
+## Attack を Garbage として送った（[signal GarbageRouter.garbage_routed] と同じ形。要件定義 §112）。
+signal garbage_routed(source_player_id: int, target_player_id: int, line_count: int)
+
+## Garbage が盤面へ積まれた（[signal GarbageRouter.garbage_received] と同じ形。要件定義 §112）。
+signal garbage_received(victim_player_id: int, source_player_id: int, line_count: int)
+
 ## 1 フレームぶんの時間（秒）。
 const DEFAULT_FRAME_DELTA: float = 1.0 / 60.0
 
@@ -387,6 +393,7 @@ func _on_human_attack(amount: int, _context: AttackContext, source_id: int) -> v
 # 相殺で消えた行は積まれないので、ここには来ない。
 func _on_human_garbage_applied(source_id: int, line_count: int, victim_id: int) -> void:
 	_attribution.record_application(victim_id, source_id, _elapsed_sec, line_count)
+	garbage_received.emit(victim_id, source_id, line_count)
 
 
 func _record_frame_time(elapsed_usec: int) -> void:
@@ -415,6 +422,7 @@ func _send_attack(source_id: int, line_count: int) -> void:
 	# Attack Multiplier は Battle Layer の規則（要件定義 §57）。CPU 側で
 	# 作り直さず、Battle が持っている倍率をそのまま掛ける。
 	var sent: int = MultiplierSystem.apply(line_count, source)
+	garbage_routed.emit(source_id, target.player_id, sent)
 
 	if target.is_human():
 		# KO の帰属は、盤面へ実際に積まれた時点で記録する（_on_human_garbage_applied）。
@@ -424,6 +432,7 @@ func _send_attack(source_id: int, line_count: int) -> void:
 		# 積まれた時点を送り手ごとに追えない。送った時点で記録する。
 		_cpus.receive_garbage(target.player_id, sent)
 		_attribution.record_application(target.player_id, source_id, _elapsed_sec, sent)
+		garbage_received.emit(target.player_id, source_id, sent)
 	else:
 		_cpus.receive_garbage(target.player_id, sent)
 		# KO の帰属は、盤面へ実際に積まれた時点で記録する（_attribute_applied_garbage）。
@@ -467,6 +476,7 @@ func _consume_garbage(queue: Array, line_count: int, victim_id: int) -> void:
 		var lines: int = mini(remaining, entry[1])
 		if victim_id >= 0:
 			_attribution.record_application(victim_id, entry[0], _elapsed_sec, lines)
+			garbage_received.emit(victim_id, entry[0], lines)
 		entry[1] -= lines
 		remaining -= lines
 		if entry[1] <= 0:

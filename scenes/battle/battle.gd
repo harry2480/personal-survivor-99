@@ -287,7 +287,7 @@ func _watch_progress() -> void:
 		viewer.session.perfect_clear_achieved.connect(func() -> void: _perfect_clear_count += 1)
 
 	_runner.get_ko_system().player_ko.connect(_on_player_ko)
-	_logger.bind(manager, _runner.get_ko_system(), _runner.get_target_manager(), null)
+	_logger.bind(manager, _runner.get_ko_system(), _runner.get_target_manager(), _runner)
 
 
 func _on_lines_cleared(result: LineClearResult) -> void:
