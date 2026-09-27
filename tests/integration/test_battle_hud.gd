@@ -137,6 +137,30 @@ func test_dead_attackers_are_not_counted() -> void:
 	assert_eq(hud.get_value("attackers"), "0", "脱落した相手は数えない")
 
 
+func test_attackers_follow_the_target_manager() -> void:
+	# 誰を攻撃者とみなすかは Battle Layer が決める。HUD は同じ答えを出すだけ。
+	manager.get_player(2).current_target = VIEWER_ID
+	manager.get_player(4).current_target = VIEWER_ID
+
+	hud.refresh_attackers()
+
+	assert_eq(
+		hud.get_value("attackers"),
+		str(targets.get_attackers_of(VIEWER_ID).size()),
+		"TargetManager と同じ数を出す"
+	)
+
+
+func test_attackers_are_left_alone_without_a_target_manager() -> void:
+	manager.get_player(2).current_target = VIEWER_ID
+	hud.bind(manager, VIEWER_ID, ko)
+
+	hud.refresh_attackers()
+
+	# 前の bind で出した "0" のまま。数え直していれば "1" になる。
+	assert_eq(hud.get_value("attackers"), "0", "TargetManager が無ければ数えない（落ちない）")
+
+
 func test_attackers_are_not_counted_every_frame() -> void:
 	manager.get_player(2).current_target = VIEWER_ID
 	hud.refresh_attackers()
