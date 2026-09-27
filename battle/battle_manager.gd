@@ -171,6 +171,11 @@ func eliminate_player(player_id: int) -> void:
 	_check_finished()
 
 
+## Player ごとの Seed を返す。セッションを作り直すときに同じ Piece 列を使うため。
+func get_player_seed(player_id: int) -> int:
+	return _seed_for(player_id)
+
+
 func _seed_for(player_id: int) -> int:
 	# Player ごとに Seed をずらす。Battle Seed を決めれば全体が再現できる。
 	return _battle_seed + player_id * 7919

@@ -112,11 +112,9 @@ func bind(
 	_connections = [[_manager.player_eliminated, on_eliminated], [_manager.phase_changed, on_phase]]
 
 	if _targets != null:
-		var on_target: Callable = func(player_id: int, _previous: int, current: int) -> void:
-			if player_id != _viewer_id:
-				return
-			_set_value("target", _format_player(current))
-			_set_value("target_mode", _format_target_mode(_viewer()))
+		var on_target: Callable = func(player_id: int, _previous: int, _current: int) -> void:
+			if player_id == _viewer_id:
+				refresh_target()
 		_targets.target_changed.connect(on_target)
 		_connections.append([_targets.target_changed, on_target])
 
@@ -193,11 +191,20 @@ func refresh_all() -> void:
 	_set_value("rank", _format_rank(viewer))
 	_set_value("ko", str(viewer.ko_count) if viewer != null else "0")
 	_set_value("multiplier", "x%.2f" % (viewer.attack_multiplier if viewer != null else 1.0))
-	_set_value("target_mode", _format_target_mode(viewer))
-	_set_value("target", _format_player(viewer.current_target if viewer != null else -1))
+	refresh_target()
 	refresh_incoming()
 	refresh_attackers()
 	_on_phase_changed(_manager.get_phase())
+
+
+## Target と Target Mode を読み直す。
+##
+## Manual Target の指定だけでは target_changed が出ないことがある（指定先が今の
+## Target と同じとき）ので、指定した側からも呼ぶ。
+func refresh_target() -> void:
+	var viewer: BattlePlayerState = _viewer()
+	_set_value("target_mode", _format_target_mode(viewer))
+	_set_value("target", _format_player(viewer.current_target if viewer != null else -1))
 
 
 ## Incoming Garbage を読み直す。
