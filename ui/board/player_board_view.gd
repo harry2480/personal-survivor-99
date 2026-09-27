@@ -258,8 +258,9 @@ func _read_incoming() -> int:
 
 # Danger は Battle Layer の判定をそのまま映す（要件定義 §92）。
 #
-# Battle がいない単体プレイのときだけ、Game Core の盤面から求める。
+# UI では判定しない。Battle Layer の状態を渡されていなければ SAFE として扱う。
+# 単体プレイでも、画面が BattlePlayerState を持って判定させてから渡す（solo_play.gd）。
 func _read_danger() -> DangerLevel.Level:
 	if _player != null:
 		return _player.danger_level
-	return DangerLevel.get_level(_session.get_board())
+	return DangerLevel.Level.SAFE
