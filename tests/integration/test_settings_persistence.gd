@@ -6,6 +6,7 @@ extends GutTest
 ## 設定がゲーム側へ効くことを見る（#52 の完了条件）。
 
 const SETTINGS_SCENE := preload("res://scenes/settings/settings.tscn")
+const SETTINGS_SCRIPT := preload("res://scenes/settings/settings.gd")
 const TEST_DIR: String = "user://test_settings/"
 
 var store: SettingsStore
@@ -23,10 +24,22 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	_free_settings_screens()
 	SceneRouter.settings_store = SettingsStore.new()
 	SceneRouter.set_user_settings(_original_settings)
 	store.delete_document(SettingsStore.SETTINGS_DOCUMENT)
 	store.delete_document(SettingsStore.STATISTICS_DOCUMENT)
+
+
+# 残っている Settings 画面を、設定を戻す前に消す。
+#
+# GUT は add_child_autofree() したノードを after_each() の後に解放する。そのままだと
+# Settings の _exit_tree() の保存が戻したあとに走り、SceneRouter の設定と
+# テスト用の保存ファイルを書き戻してしまう。
+func _free_settings_screens() -> void:
+	for node in get_tree().root.find_children("*", "Control", true, false):
+		if node.get_script() == SETTINGS_SCRIPT and is_instance_valid(node):
+			node.free()
 
 
 func _write_raw(document: String, text: String) -> void:
@@ -268,3 +281,24 @@ func test_cpu_difficulty_in_settings_becomes_the_next_battle_default() -> void:
 		settings.cpu_settings,
 		"Main Menu で変えても保存済みの設定は書き換わらない（複製を渡す）"
 	)
+
+
+func test_opening_the_screen_keeps_every_binding() -> void:
+	var before: int = _count_joypad_buttons(&"hold")
+	var screen: Control = SETTINGS_SCENE.instantiate()
+	add_child_autofree(screen)
+	await wait_frames(1)
+
+	screen.save()
+	SettingsApplier.apply_input(store.load_settings())
+
+	assert_eq(before, 2, "前提: hold には Controller の割り当てが 2 つある")
+	assert_eq(_count_joypad_buttons(&"hold"), before, "開いて保存しても 2 つ目が消えない")
+
+
+func _count_joypad_buttons(action: StringName) -> int:
+	var count: int = 0
+	for event in InputMap.action_get_events(action):
+		if event is InputEventJoypadButton:
+			count += 1
+	return count

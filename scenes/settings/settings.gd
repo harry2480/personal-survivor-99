@@ -130,18 +130,24 @@ func _build_input(root: Control) -> void:
 	root.add_child(_section_label("INPUT"))
 	_add_slider(root, "stick_dead_zone", "DEAD ZONE", 0.0, 1.0, 0.01, _settings.stick_dead_zone)
 
-	# Keyboard / Controller の割り当ては、いまの内容を読み出して持たせておく。
+	# Keyboard / Controller の割り当ては、件数を出すだけ。
 	# 個別の割り当て直し UI（1 キーずつ取り直す）は Accessibility（§128）の範囲。
-	if _settings.keyboard_bindings.is_empty():
-		_settings.keyboard_bindings = SettingsApplier.read_keyboard_bindings()
-	if _settings.controller_bindings.is_empty():
-		_settings.controller_bindings = SettingsApplier.read_controller_bindings()
+	#
+	# 読み出した割り当ては _settings へ入れない。読み出しは Action ごとに 1 つだけ
+	# なので、保存して反映し直すと 2 つ目以降（hold の Button 10 など）が消える。
+	var keyboard: Dictionary = (
+		_settings.keyboard_bindings
+		if not _settings.keyboard_bindings.is_empty()
+		else SettingsApplier.read_keyboard_bindings()
+	)
+	var controller: Dictionary = (
+		_settings.controller_bindings
+		if not _settings.controller_bindings.is_empty()
+		else SettingsApplier.read_controller_bindings()
+	)
 
 	var label := Label.new()
-	label.text = (
-		"KEYBOARD %d / CONTROLLER %d"
-		% [_settings.keyboard_bindings.size(), _settings.controller_bindings.size()]
-	)
+	label.text = "KEYBOARD %d / CONTROLLER %d" % [keyboard.size(), controller.size()]
 	root.add_child(label)
 
 

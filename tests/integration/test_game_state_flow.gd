@@ -7,6 +7,7 @@ extends GutTest
 
 const MAIN_MENU := preload("res://scenes/main_menu/main_menu.tscn")
 const BATTLE := preload("res://scenes/battle/battle.tscn")
+const SETTINGS_SCRIPT := preload("res://scenes/settings/settings.gd")
 
 const TEST_SETTINGS_DIR: String = "user://test_game_state_flow/"
 
@@ -25,10 +26,22 @@ func before_each() -> void:
 
 func after_each() -> void:
 	SceneRouter.close_settings()
+	_free_settings_screens()
 	SceneRouter.current_state = GameState.State.MAIN_MENU
 	SceneRouter.settings_store.delete_document(SettingsStore.SETTINGS_DOCUMENT)
 	SceneRouter.settings_store = SettingsStore.new()
 	SceneRouter.set_user_settings(_original_settings)
+
+
+# 残っている Settings 画面を、設定を戻す前に消す。
+#
+# GUT は add_child_autofree() したノードを after_each() の後に解放する。そのままだと
+# Settings の _exit_tree() の保存が戻したあとに走り、SceneRouter の設定と
+# テスト用の保存ファイルを書き戻してしまう。
+func _free_settings_screens() -> void:
+	for node in get_tree().root.find_children("*", "Control", true, false):
+		if node.get_script() == SETTINGS_SCRIPT and is_instance_valid(node):
+			node.free()
 
 
 # --- 状態遷移（要件定義 §109） ----------------------------------------------
