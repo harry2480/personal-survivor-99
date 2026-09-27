@@ -66,10 +66,13 @@ func bind(session: PuzzleSession, player: BattlePlayerState = null) -> void:
 	var on_locked: Callable = func(_type: int) -> void: _cells_dirty = true
 	var on_cleared: Callable = func(_result: LineClearResult) -> void: _cells_dirty = true
 	var on_garbage: Callable = func(_lines: int) -> void: _cells_dirty = true
+	# 同じ Session の再開（start()）は盤面を消すが、Lock も Line Clear も起こさない。
+	var on_started: Callable = func() -> void: _cells_dirty = true
 	_session.piece_locked.connect(on_locked)
 	_session.lines_cleared.connect(on_cleared)
 	_session.garbage_applied.connect(on_garbage)
-	_connections = [on_locked, on_cleared, on_garbage]
+	_session.started.connect(on_started)
+	_connections = [on_locked, on_cleared, on_garbage, on_started]
 
 	_cells_dirty = true
 	refresh()
@@ -77,10 +80,11 @@ func bind(session: PuzzleSession, player: BattlePlayerState = null) -> void:
 
 ## 結び付けを解く。参照の循環を残さない。
 func unbind() -> void:
-	if _session != null and _connections.size() == 3:
+	if _session != null and _connections.size() == 4:
 		_session.piece_locked.disconnect(_connections[0])
 		_session.lines_cleared.disconnect(_connections[1])
 		_session.garbage_applied.disconnect(_connections[2])
+		_session.started.disconnect(_connections[3])
 	_connections.clear()
 	_session = null
 	_player = null
@@ -254,8 +258,9 @@ func _read_incoming() -> int:
 
 # Danger は Battle Layer の判定をそのまま映す（要件定義 §92）。
 #
-# Battle がいない単体プレイのときだけ、Game Core の盤面から求める。
+# UI では判定しない。Battle Layer の状態を渡されていなければ SAFE として扱う。
+# 単体プレイでも、画面が BattlePlayerState を持って判定させてから渡す（solo_play.gd）。
 func _read_danger() -> DangerLevel.Level:
 	if _player != null:
 		return _player.danger_level
-	return DangerLevel.get_level(_session.get_board())
+	return DangerLevel.Level.SAFE
