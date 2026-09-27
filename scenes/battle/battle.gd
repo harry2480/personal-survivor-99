@@ -42,6 +42,7 @@ var _music: MusicManager
 var _setup: BattleSetup
 var _paused: bool = false
 var _finished: bool = false
+var _viewer_danger: DangerLevel.Level = DangerLevel.Level.SAFE
 
 
 func _ready() -> void:
@@ -58,6 +59,7 @@ func _process(delta: float) -> void:
 		return
 
 	_runner.step(delta)
+	_notify_viewer_danger()
 	if _runner.get_manager().is_finished():
 		_on_battle_finished()
 
@@ -200,6 +202,17 @@ func _build_audio() -> void:
 		func(_previous: int, current: int) -> void:
 			_music.follow_phase(current as BattlePhase.Phase)
 	)
+
+
+# 自分の Danger が上がった瞬間だけ SE を鳴らす。判定は Battle Layer の値を使う（§92）。
+func _notify_viewer_danger() -> void:
+	var viewer: BattlePlayerState = get_viewer()
+	if viewer == null or _audio == null:
+		return
+	var level: DangerLevel.Level = viewer.danger_level
+	if level > _viewer_danger:
+		_audio.notify_danger(level)
+	_viewer_danger = level
 
 
 func _build_pause_menu() -> void:
