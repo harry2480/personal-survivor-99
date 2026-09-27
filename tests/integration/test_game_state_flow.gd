@@ -8,16 +8,27 @@ extends GutTest
 const MAIN_MENU := preload("res://scenes/main_menu/main_menu.tscn")
 const BATTLE := preload("res://scenes/battle/battle.tscn")
 
+const TEST_SETTINGS_DIR: String = "user://test_game_state_flow/"
+
+var _original_settings: UserSettings
+
 
 func before_each() -> void:
 	# 他のテストの影響を受けないよう、毎回 Main Menu の状態から始める。
 	SceneRouter.current_state = GameState.State.MAIN_MENU
 	SceneRouter.set_battle_setup(BattleSetup.create_default())
+	# Settings を開くテストが、本物の user://settings.json を書き換えないようにする。
+	DirAccess.make_dir_recursive_absolute(TEST_SETTINGS_DIR)
+	_original_settings = SceneRouter.get_user_settings()
+	SceneRouter.settings_store = SettingsStore.new(TEST_SETTINGS_DIR)
 
 
 func after_each() -> void:
 	SceneRouter.close_settings()
 	SceneRouter.current_state = GameState.State.MAIN_MENU
+	SceneRouter.settings_store.delete_document(SettingsStore.SETTINGS_DOCUMENT)
+	SceneRouter.settings_store = SettingsStore.new()
+	SceneRouter.set_user_settings(_original_settings)
 
 
 # --- 状態遷移（要件定義 §109） ----------------------------------------------
@@ -186,6 +197,30 @@ func test_settings_from_pause_keeps_the_battle() -> void:
 	battle.get_pause_menu().select(PauseMenu.Action.RESUME)
 
 	assert_eq(SceneRouter.current_state, GameState.State.PLAYING, "そのまま再開できる")
+
+
+func test_settings_changed_during_pause_reach_the_battle() -> void:
+	var setup: BattleSetup = BattleSetup.create_default()
+	setup.player_count = 2
+	SceneRouter.set_battle_setup(setup)
+	SceneRouter.current_state = GameState.State.PLAYING
+	var battle: Node = BATTLE.instantiate()
+	add_child_autofree(battle)
+	battle.set_paused(true)
+	battle.get_pause_menu().select(PauseMenu.Action.SETTINGS)
+	await wait_frames(1)
+
+	# Settings 画面で値を変えて閉じる（閉じるときに保存される）。
+	var screen: Node = battle.get_node("Settings")
+	screen.get_settings().das_sec = 0.05
+	screen.get_settings().ghost_enabled = false
+	screen.close()
+	await wait_frames(1)
+
+	assert_almost_eq(battle.get_human_rules().das_sec, 0.05, 0.0001, "DAS がいまの Battle に効く")
+	assert_false(
+		battle.get_node("PlayerBoardPanel").get_board_view().is_ghost_enabled(), "Ghost 設定も効く"
+	)
 
 
 func test_opening_settings_twice_keeps_one() -> void:

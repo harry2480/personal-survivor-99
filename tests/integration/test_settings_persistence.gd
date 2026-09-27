@@ -9,6 +9,7 @@ const SETTINGS_SCENE := preload("res://scenes/settings/settings.tscn")
 const TEST_DIR: String = "user://test_settings/"
 
 var store: SettingsStore
+var _original_settings: UserSettings
 
 
 func before_each() -> void:
@@ -16,9 +17,14 @@ func before_each() -> void:
 	store = SettingsStore.new(TEST_DIR)
 	store.delete_document(SettingsStore.SETTINGS_DOCUMENT)
 	store.delete_document(SettingsStore.STATISTICS_DOCUMENT)
+	# Settings 画面が本物の user://settings.json を書き換えないようにする。
+	_original_settings = SceneRouter.get_user_settings()
+	SceneRouter.settings_store = store
 
 
 func after_each() -> void:
+	SceneRouter.settings_store = SettingsStore.new()
+	SceneRouter.set_user_settings(_original_settings)
 	store.delete_document(SettingsStore.SETTINGS_DOCUMENT)
 	store.delete_document(SettingsStore.STATISTICS_DOCUMENT)
 
@@ -236,3 +242,29 @@ func test_settings_screen_saves_on_close() -> void:
 
 	var reloaded: UserSettings = screen.get_store().load_settings()
 	assert_almost_eq(reloaded.master_volume, 0.11, 0.0001, "保存した値が残る")
+
+
+func test_settings_screen_uses_the_router_store() -> void:
+	var screen: Control = SETTINGS_SCENE.instantiate()
+	add_child_autofree(screen)
+	await wait_frames(1)
+
+	assert_same(screen.get_store(), SceneRouter.settings_store, "保存先は 1 か所（要件定義 §98）")
+
+
+func test_cpu_difficulty_in_settings_becomes_the_next_battle_default() -> void:
+	var settings := UserSettings.create_default()
+	settings.cpu_settings.preset = CpuPreset.Preset.HARD
+
+	SceneRouter.set_user_settings(settings)
+
+	assert_eq(
+		SceneRouter.get_battle_setup().cpu_settings.preset,
+		CpuPreset.Preset.HARD,
+		"Settings の CPU 難易度が次の Battle に使われる"
+	)
+	assert_ne(
+		SceneRouter.get_battle_setup().cpu_settings,
+		settings.cpu_settings,
+		"Main Menu で変えても保存済みの設定は書き換わらない（複製を渡す）"
+	)

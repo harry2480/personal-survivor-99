@@ -14,14 +14,24 @@ extends Control
 ## 閉じるときに使う Action。
 const CLOSE_ACTION: StringName = &"ui_cancel"
 
+## 変えたときに Audio を反映する項目。
+const AUDIO_KEYS: Array[String] = ["master_volume", "bgm_volume", "se_volume"]
+
+## 変えたときに Video を反映する項目。
+const VIDEO_KEYS: Array[String] = ["fullscreen", "vsync_enabled", "fps_limit"]
+
+## 変えたときに Input を反映する項目。
+const INPUT_KEYS: Array[String] = ["stick_dead_zone"]
+
 ## CPU 難易度の設定も同じ画面から触れる（要件定義 §97 の Gameplay）。
 var _difficulty_panel: CpuDifficultyPanel
-var _store := SettingsStore.new()
+var _store: SettingsStore
 var _settings: UserSettings
 var _controls: Dictionary = {}
 
 
 func _ready() -> void:
+	_store = SceneRouter.settings_store
 	_settings = _store.load_settings()
 
 	var root := VBoxContainer.new()
@@ -43,8 +53,6 @@ func _ready() -> void:
 	back.text = "BACK"
 	back.pressed.connect(close)
 	root.add_child(back)
-
-	SettingsApplier.apply_all(_settings)
 
 
 func _exit_tree() -> void:
@@ -182,5 +190,12 @@ func _on_value_changed(key: String, value: Variant) -> void:
 	else:
 		_settings.set(key, value)
 
-	# 変えたらその場で効かせる（要件定義 §97）。
-	SettingsApplier.apply_all(_settings)
+	# 変えたらその場で効かせる（要件定義 §97）。変えた項目の分だけ反映する。
+	# まとめて反映すると、音量を触るだけでウィンドウの大きさが戻ってしまう。
+	if key in AUDIO_KEYS:
+		SettingsApplier.apply_audio(_settings)
+	elif key in VIDEO_KEYS:
+		SettingsApplier.apply_video(_settings)
+	elif key in INPUT_KEYS:
+		SettingsApplier.apply_input(_settings)
+	# Gameplay（DAS / ARR / Soft Drop / Ghost）は Battle が開始時と Settings を閉じたときに読む。

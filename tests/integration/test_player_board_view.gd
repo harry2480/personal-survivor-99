@@ -123,6 +123,19 @@ func test_a_piece_in_the_spawn_buffer_is_not_drawn() -> void:
 	assert_eq(view.get_ghost_cells().size(), Piece.CELL_COUNT, "Ghost は盤面の底に出る")
 
 
+func test_ghost_can_be_turned_off() -> void:
+	_move_piece_into_view()
+
+	view.set_ghost_enabled(false)
+
+	assert_eq(view.get_ghost_cells().size(), 0, "Ghost 設定が OFF なら出さない（要件定義 §97）")
+	assert_eq(view.get_active_cells().size(), Piece.CELL_COUNT, "Active Piece は出たまま")
+
+	view.set_ghost_enabled(true)
+
+	assert_eq(view.get_ghost_cells().size(), Piece.CELL_COUNT, "ON に戻せば出る")
+
+
 func test_ghost_sits_at_the_landing_position() -> void:
 	view.refresh()
 
