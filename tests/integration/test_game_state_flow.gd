@@ -6,16 +6,42 @@ extends GutTest
 ## 繰り返しても状態が壊れないことを見る（#51 の完了条件）。
 
 const MAIN_MENU := preload("res://scenes/main_menu/main_menu.tscn")
+const BATTLE := preload("res://scenes/battle/battle.tscn")
+const SETTINGS_SCRIPT := preload("res://scenes/settings/settings.gd")
+
+const TEST_SETTINGS_DIR: String = "user://test_game_state_flow/"
+
+var _original_settings: UserSettings
 
 
 func before_each() -> void:
 	# 他のテストの影響を受けないよう、毎回 Main Menu の状態から始める。
 	SceneRouter.current_state = GameState.State.MAIN_MENU
 	SceneRouter.set_battle_setup(BattleSetup.create_default())
+	# Settings を開くテストが、本物の user://settings.json を書き換えないようにする。
+	DirAccess.make_dir_recursive_absolute(TEST_SETTINGS_DIR)
+	_original_settings = SceneRouter.get_user_settings()
+	SceneRouter.settings_store = SettingsStore.new(TEST_SETTINGS_DIR)
 
 
 func after_each() -> void:
+	SceneRouter.close_settings()
+	_free_settings_screens()
 	SceneRouter.current_state = GameState.State.MAIN_MENU
+	SceneRouter.settings_store.delete_document(SettingsStore.SETTINGS_DOCUMENT)
+	SceneRouter.settings_store = SettingsStore.new()
+	SceneRouter.set_user_settings(_original_settings)
+
+
+# 残っている Settings 画面を、設定を戻す前に消す。
+#
+# GUT は add_child_autofree() したノードを after_each() の後に解放する。そのままだと
+# Settings の _exit_tree() の保存が戻したあとに走り、SceneRouter の設定と
+# テスト用の保存ファイルを書き戻してしまう。
+func _free_settings_screens() -> void:
+	for node in get_tree().root.find_children("*", "Control", true, false):
+		if node.get_script() == SETTINGS_SCRIPT and is_instance_valid(node):
+			node.free()
 
 
 # --- 状態遷移（要件定義 §109） ----------------------------------------------
@@ -136,6 +162,88 @@ func test_pause_menu_reports_the_selection() -> void:
 	menu.select(PauseMenu.Action.RESTART)
 
 	assert_eq(selected, [PauseMenu.Action.RESTART] as Array[int], "選ばれた項目を伝える")
+
+
+# --- Settings（要件定義 §94 / §96 / §107） ---------------------------------
+
+
+func test_settings_from_the_menu_keeps_the_state() -> void:
+	var menu: Control = MAIN_MENU.instantiate()
+	add_child_autofree(menu)
+
+	menu._on_settings_pressed()
+
+	assert_true(SceneRouter.is_settings_open(), "Settings が開く")
+	assert_eq(SceneRouter.current_state, GameState.State.MAIN_MENU, "状態は MAIN_MENU のまま")
+	assert_true(is_instance_valid(menu) and menu.is_inside_tree(), "Main Menu は残る")
+
+	SceneRouter.close_settings()
+	await wait_frames(1)
+
+	assert_false(SceneRouter.is_settings_open(), "閉じると Main Menu へ戻る")
+	assert_eq(menu.get_child_count(), 1, "Settings は取り除かれる")
+
+
+func test_settings_from_pause_keeps_the_battle() -> void:
+	var setup: BattleSetup = BattleSetup.create_default()
+	setup.player_count = 2
+	SceneRouter.set_battle_setup(setup)
+	SceneRouter.current_state = GameState.State.PLAYING
+	var battle: Node = BATTLE.instantiate()
+	add_child_autofree(battle)
+	battle.set_paused(true)
+
+	battle.get_pause_menu().select(PauseMenu.Action.SETTINGS)
+
+	assert_true(SceneRouter.is_settings_open(), "Settings が開く")
+	assert_eq(SceneRouter.current_state, GameState.State.PAUSED, "状態は PAUSED のまま")
+	assert_true(is_instance_valid(battle) and battle.is_inside_tree(), "Battle は破棄されない")
+	assert_true(battle.is_paused(), "Pause したまま")
+	assert_false(battle.get_pause_menu().visible, "Pause メニューは Settings の下に隠す")
+
+	SceneRouter.close_settings()
+	await wait_frames(1)
+
+	assert_false(SceneRouter.is_settings_open(), "閉じられる")
+	assert_true(battle.get_pause_menu().visible, "Pause メニューへ戻る")
+
+	battle.get_pause_menu().select(PauseMenu.Action.RESUME)
+
+	assert_eq(SceneRouter.current_state, GameState.State.PLAYING, "そのまま再開できる")
+
+
+func test_settings_changed_during_pause_reach_the_battle() -> void:
+	var setup: BattleSetup = BattleSetup.create_default()
+	setup.player_count = 2
+	SceneRouter.set_battle_setup(setup)
+	SceneRouter.current_state = GameState.State.PLAYING
+	var battle: Node = BATTLE.instantiate()
+	add_child_autofree(battle)
+	battle.set_paused(true)
+	battle.get_pause_menu().select(PauseMenu.Action.SETTINGS)
+	await wait_frames(1)
+
+	# Settings 画面で値を変えて閉じる（閉じるときに保存される）。
+	var screen: Node = battle.get_node("Settings")
+	screen.get_settings().das_sec = 0.05
+	screen.get_settings().ghost_enabled = false
+	screen.close()
+	await wait_frames(1)
+
+	assert_almost_eq(battle.get_human_rules().das_sec, 0.05, 0.0001, "DAS がいまの Battle に効く")
+	assert_false(
+		battle.get_node("PlayerBoardPanel").get_board_view().is_ghost_enabled(), "Ghost 設定も効く"
+	)
+
+
+func test_opening_settings_twice_keeps_one() -> void:
+	var menu: Control = MAIN_MENU.instantiate()
+	add_child_autofree(menu)
+
+	var first: Node = SceneRouter.open_settings(menu)
+	var second: Node = SceneRouter.open_settings(menu)
+
+	assert_same(second, first, "二重には開かない")
 
 
 # --- Restart / Quit to Menu（要件定義 §96） ---------------------------------

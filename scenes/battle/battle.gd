@@ -40,6 +40,7 @@ var _pause_menu: PauseMenu
 var _audio: AudioManager
 var _music: MusicManager
 var _setup: BattleSetup
+var _human_rules: GameRules
 var _paused: bool = false
 var _finished: bool = false
 var _viewer_danger: DangerLevel.Level = DangerLevel.Level.SAFE
@@ -122,6 +123,11 @@ func get_setup() -> BattleSetup:
 	return _setup
 
 
+## 自分の盤面が読んでいるルールを返す（ユーザー設定を重ねたもの）。
+func get_human_rules() -> GameRules:
+	return _human_rules
+
+
 func _create_runner() -> CpuBattleRunner:
 	var mapping: Resource = load("res://config/cpu_strength_mapping.tres")
 	var runner := CpuBattleRunner.new(
@@ -140,16 +146,31 @@ func _create_runner() -> CpuBattleRunner:
 
 
 # 自分の盤面のルールを作る。config の値に、ユーザー設定（#52）を重ねる。
+#
+# load() が返す Resource は共有されるので、複製してから書き換える。
 func _load_human_rules() -> GameRules:
 	var loaded: Resource = load("res://config/game_rules.tres")
-	var rules: GameRules = loaded if loaded is GameRules else GameRules.create_default()
+	_human_rules = loaded.duplicate() if loaded is GameRules else GameRules.create_default()
+	_apply_user_settings()
+	return _human_rules
+
+
+# ユーザー設定（#52）を自分の盤面のルールと表示へ重ねる。
+#
+# Pause 中に Settings を閉じたときも呼ぶ。Session は同じ GameRules を読み続けるので、
+# DAS / ARR / Soft Drop はその場で効く（要件定義 §97）。
+func _apply_user_settings() -> void:
 	var settings: UserSettings = SceneRouter.get_user_settings()
-	SettingsApplier.apply_gameplay(settings, rules)
+	if _human_rules != null:
+		SettingsApplier.apply_gameplay(settings, _human_rules)
 	# Dead Zone は Input の設定（要件定義 §97）。Game Core の GameRules には持たせない。
 	InputManager.apply_dead_zone(
 		settings.stick_dead_zone if settings != null else InputManager.DEFAULT_DEAD_ZONE
 	)
-	return rules
+	if _board_panel != null:
+		_board_panel.get_board_view().set_ghost_enabled(
+			settings.ghost_enabled if settings != null else true
+		)
 
 
 func _build_views() -> void:
@@ -170,6 +191,7 @@ func _build_views() -> void:
 	_board_panel.position = MARGIN + Vector2(0.0, 360.0)
 	add_child(_board_panel)
 	_board_panel.bind(viewer.session, viewer)
+	_apply_user_settings()
 
 	_hud = BattleHud.new()
 	_hud.name = "BattleHud"
@@ -231,10 +253,31 @@ func _on_pause_action(action: PauseMenu.Action) -> void:
 		PauseMenu.Action.RESTART:
 			SceneRouter.restart_battle()
 		PauseMenu.Action.SETTINGS:
-			# Settings の中身は #52。ここでは開く口だけ用意しておく。
-			get_tree().change_scene_to_file("res://scenes/settings/settings.tscn")
+			_open_settings()
 		PauseMenu.Action.QUIT_TO_MENU:
 			SceneRouter.quit_to_menu()
+
+
+## Settings を Battle の上に重ねて開く（要件定義 §96）。
+##
+## Scene を切り替えると Battle が破棄されるので、Pause したまま重ねる。
+## 閉じたら Pause メニューへ戻る。
+func _open_settings() -> void:
+	var overlay: Node = SceneRouter.open_settings(self)
+	if overlay == null:
+		return
+	_pause_menu.visible = false
+	if not overlay.tree_exited.is_connected(_on_settings_closed):
+		overlay.tree_exited.connect(_on_settings_closed)
+
+
+func _on_settings_closed() -> void:
+	if not is_inside_tree():
+		return
+	# Settings で変えた値を、いまの Battle へ効かせる。
+	_apply_user_settings()
+	if _pause_menu != null:
+		_pause_menu.visible = _paused
 
 
 func _on_battle_finished() -> void:
@@ -264,11 +307,26 @@ func _build_input() -> void:
 
 func _on_opponent_selected(player_id: int) -> void:
 	# Target にするかどうかは Battle Layer が決める（要件定義 §53）。
-	_runner.get_target_manager().set_manual_target(VIEWER_ID, player_id)
+	var targets: TargetManager = _runner.get_target_manager()
+	if not targets.set_manual_target(VIEWER_ID, player_id):
+		return
+	# 次の step() を待たずに反映する。待つと、その間の攻撃が前の Target へ飛ぶ。
+	targets.update_target(VIEWER_ID)
+	# 今の Target を選び直した場合は target_changed が出ないので、HUD を読み直させる。
+	_hud.refresh_target()
 
 
 func _on_command_pressed(command: GameCommand.Command) -> void:
-	var session: PuzzleSession = _viewer_session()
+	# Settings を開いている間は、下の Battle へ操作を渡さない。
+	if SceneRouter.is_settings_open():
+		return
+
+	if command == GameCommand.Command.PAUSE:
+		set_paused(not _paused)
+		return
+
+	# 止めている間は盤面を動かさない（要件定義 §96）。
+	var session: PuzzleSession = null if _paused else _viewer_session()
 	if session == null:
 		return
 
@@ -287,10 +345,8 @@ func _on_command_pressed(command: GameCommand.Command) -> void:
 			session.rotate(RotationSystem.Direction.CLOCKWISE)
 		GameCommand.Command.HOLD:
 			session.hold()
-		GameCommand.Command.PAUSE:
-			set_paused(not _paused)
 
-	if _audio != null and command != GameCommand.Command.PAUSE:
+	if _audio != null:
 		_audio.play_for_command(command)
 
 

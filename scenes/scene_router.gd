@@ -25,6 +25,10 @@ const SCENE_PATHS: Dictionary = {
 	GameState.State.RESULT: "res://scenes/result/result.tscn",
 }
 
+## Settings 画面（要件定義 §107）。Game State（§109）には Settings が無いので、
+## 状態も Scene も切り替えず、今の画面の上に重ねて開く。
+const SETTINGS_SCENE_PATH: String = "res://scenes/settings/settings.tscn"
+
 ## 許される遷移（要件定義 §109）。
 ##
 ## Pause は Scene を切り替えず、PLAYING の上に重ねる。Restart は
@@ -43,9 +47,13 @@ const ALLOWED_TRANSITIONS: Dictionary = {
 
 var current_state: GameState.State = GameState.State.BOOT
 
+## ユーザー設定の保存先（要件定義 §98）。テストでは別のディレクトリへ差し替える。
+var settings_store: SettingsStore = SettingsStore.new()
+
 var _current_scene_path: String = ""
 var _battle_setup: BattleSetup = BattleSetup.create_default()
 var _user_settings: UserSettings = null
+var _settings_overlay: Node
 
 
 ## ユーザー設定を返す（要件定義 §97 / §98）。
@@ -53,14 +61,24 @@ var _user_settings: UserSettings = null
 ## まだ読んでいなければ、ここで `user://` から読む。読めなければ既定値。
 func get_user_settings() -> UserSettings:
 	if _user_settings == null:
-		_user_settings = SettingsStore.new().load_settings()
+		_user_settings = settings_store.load_settings()
+		_sync_cpu_settings()
 	return _user_settings
 
 
 ## ユーザー設定を差し替える（Settings 画面が保存したあとに呼ぶ）。
+##
+## Settings で選んだ CPU 難易度は、次の Battle の既定にもなる（要件定義 §97）。
 func set_user_settings(settings: UserSettings) -> void:
 	if settings != null:
 		_user_settings = settings
+		_sync_cpu_settings()
+
+
+# 保存してある CPU 難易度を、次の Battle の設定へ写す。
+func _sync_cpu_settings() -> void:
+	if _user_settings != null and _user_settings.cpu_settings != null:
+		_battle_setup.cpu_settings = _user_settings.cpu_settings.duplicate(true)
 
 
 ## その遷移が許されているかを返す（要件定義 §109）。
@@ -116,6 +134,40 @@ func set_battle_paused(paused: bool) -> void:
 		change_state(GameState.State.PAUSED)
 	elif not paused and current_state == GameState.State.PAUSED:
 		change_state(GameState.State.PLAYING)
+
+
+## Settings を [param host] の上に重ねて開く（要件定義 §94 / §96 / §107）。
+##
+## Main Menu からも Pause からも使う。[member current_state] と今の Scene は
+## そのまま残るので、閉じれば元の画面（Pause 中の Battle を含む）へ戻れる。
+## 既に開いていれば、それを返す。
+func open_settings(host: Node) -> Node:
+	if is_settings_open():
+		return _settings_overlay
+	if host == null:
+		push_warning("Settings を重ねる画面がありません")
+		return null
+
+	_settings_overlay = load(SETTINGS_SCENE_PATH).instantiate()
+	host.add_child(_settings_overlay)
+	return _settings_overlay
+
+
+## 開いている Settings を閉じる。
+func close_settings() -> void:
+	if not is_settings_open():
+		return
+	_settings_overlay.queue_free()
+	_settings_overlay = null
+
+
+## Settings が開いているかを返す。
+func is_settings_open() -> bool:
+	return (
+		is_instance_valid(_settings_overlay)
+		and _settings_overlay.is_inside_tree()
+		and not _settings_overlay.is_queued_for_deletion()
+	)
 
 
 ## Battle の決着を伝える（要件定義 §109）。

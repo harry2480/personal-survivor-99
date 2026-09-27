@@ -92,6 +92,65 @@ func test_selecting_an_opponent_sets_the_manual_target() -> void:
 	)
 
 
+func test_commands_do_not_move_the_board_while_paused() -> void:
+	var scene: Node = _new_battle_scene()
+	await wait_frames(3)
+
+	var input: InputManager = scene.get_node("InputManager")
+	input.command_pressed.emit(GameCommand.Command.PAUSE)
+	var locked: Array = []
+	scene.get_viewer().session.piece_locked.connect(func(type: int) -> void: locked.append(type))
+
+	input.command_pressed.emit(GameCommand.Command.HARD_DROP)
+	input.command_pressed.emit(GameCommand.Command.HOLD)
+
+	assert_true(scene.is_paused(), "PAUSE で止まる")
+	assert_eq(locked.size(), 0, "止めている間は Hard Drop しない（要件定義 §96）")
+	assert_true(scene.get_viewer().session.get_hold_slot().is_empty(), "Hold もしない")
+
+	input.command_pressed.emit(GameCommand.Command.PAUSE)
+	input.command_pressed.emit(GameCommand.Command.HARD_DROP)
+
+	assert_false(scene.is_paused(), "もう一度 PAUSE で戻る")
+	assert_eq(locked.size(), 1, "戻せば操作できる")
+
+
+func test_selecting_the_current_target_shows_the_manual_mode() -> void:
+	var scene: Node = _new_battle_scene()
+	await wait_frames(3)
+
+	# 今の Target をそのまま選ぶと、Target は変わらず target_changed も出ない。
+	var current: int = scene.get_viewer().current_target
+	assert_gte(current, 0, "開始時点で Target が決まっている")
+	scene.get_node("OpponentGrid").opponent_selected.emit(current)
+
+	var hud: BattleHud = scene.get_node("BattleHud")
+	assert_eq(
+		hud.get_value("target_mode"),
+		TargetMode.get_mode_name(TargetMode.Mode.MANUAL),
+		"選んだ時点で Manual と表示する（要件定義 §52）"
+	)
+
+
+func test_selected_target_takes_effect_before_the_next_step() -> void:
+	var scene: Node = _new_battle_scene()
+	await wait_frames(3)
+
+	# 止めておけば step() は走らない。選んだ直後の攻撃が新しい相手へ向かうかを見る。
+	scene.set_paused(true)
+	var viewer: BattlePlayerState = scene.get_viewer()
+	var grid: OpponentGrid = scene.get_node("OpponentGrid")
+	var target_id: int = -1
+	for tile in grid.get_tiles():
+		if tile.player_id != viewer.current_target:
+			target_id = tile.player_id
+			break
+	grid.opponent_selected.emit(target_id)
+
+	assert_eq(viewer.current_target, target_id, "選んだ時点で Target が切り替わる（要件定義 §52）")
+	assert_eq(scene.get_node("BattleHud").get_value("target"), "P%d" % target_id, "HUD も選んだ相手を出す")
+
+
 func test_defeat_sound_plays_once_when_the_viewer_loses() -> void:
 	# 自分の KO で Defeat が鳴る。決着の処理で重ねて鳴らさない（#53）。
 	SceneRouter.current_state = GameState.State.PLAYING
