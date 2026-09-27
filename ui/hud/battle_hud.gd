@@ -218,15 +218,12 @@ func refresh_incoming() -> void:
 ## 自分を狙っている Player の数を数え直す。
 ##
 ## 誰が誰を狙っているかは Signal では追い切れないため、ここだけ周期で数える。
+## 誰を攻撃者とみなすかは Battle Layer（[TargetManager]）が決める。
 func refresh_attackers() -> void:
-	if _manager == null:
+	if _targets == null:
 		return
 
-	var count: int = 0
-	for player in _manager.get_alive_players():
-		if player.player_id != _viewer_id and player.current_target == _viewer_id:
-			count += 1
-	_set_value("attackers", str(count))
+	_set_value("attackers", str(_targets.get_attackers_of(_viewer_id).size()))
 
 
 func _viewer() -> BattlePlayerState:
