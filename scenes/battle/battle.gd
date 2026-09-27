@@ -137,8 +137,11 @@ func _build_input() -> void:
 
 func _on_opponent_selected(player_id: int) -> void:
 	# Target にするかどうかは Battle Layer が決める（要件定義 §53）。
-	if not _runner.get_target_manager().set_manual_target(VIEWER_ID, player_id):
+	var targets: TargetManager = _runner.get_target_manager()
+	if not targets.set_manual_target(VIEWER_ID, player_id):
 		return
+	# 次の step() を待たずに反映する。待つと、その間の攻撃が前の Target へ飛ぶ。
+	targets.update_target(VIEWER_ID)
 	# 今の Target を選び直した場合は target_changed が出ないので、HUD を読み直させる。
 	_hud.refresh_target()
 

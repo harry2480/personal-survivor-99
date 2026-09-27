@@ -130,3 +130,22 @@ func test_selecting_the_current_target_shows_the_manual_mode() -> void:
 		TargetMode.get_mode_name(TargetMode.Mode.MANUAL),
 		"選んだ時点で Manual と表示する（要件定義 §52）"
 	)
+
+
+func test_selected_target_takes_effect_before_the_next_step() -> void:
+	var scene: Node = _new_battle_scene()
+	await wait_frames(3)
+
+	# 止めておけば step() は走らない。選んだ直後の攻撃が新しい相手へ向かうかを見る。
+	scene.set_paused(true)
+	var viewer: BattlePlayerState = scene.get_viewer()
+	var grid: OpponentGrid = scene.get_node("OpponentGrid")
+	var target_id: int = -1
+	for tile in grid.get_tiles():
+		if tile.player_id != viewer.current_target:
+			target_id = tile.player_id
+			break
+	grid.opponent_selected.emit(target_id)
+
+	assert_eq(viewer.current_target, target_id, "選んだ時点で Target が切り替わる（要件定義 §52）")
+	assert_eq(scene.get_node("BattleHud").get_value("target"), "P%d" % target_id, "HUD も選んだ相手を出す")
