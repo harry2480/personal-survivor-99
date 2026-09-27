@@ -80,6 +80,17 @@ func test_invalid_id_is_handled_safely() -> void:
 	assert_false(targets.set_manual_target(0, 999), "存在しない相手の指定も拒否する")
 
 
+func test_candidates_exclude_self_and_dead_players() -> void:
+	manager.eliminate_player(3)
+
+	var ids: Array = targets.get_candidates(_player(1)).map(
+		func(player: BattlePlayerState) -> int: return player.player_id
+	)
+
+	assert_eq_deep(ids, [0, 2, 4])
+	assert_eq(targets.get_candidates(null).size(), 0, "null なら空")
+
+
 func test_dead_player_does_not_pick_a_target() -> void:
 	manager.eliminate_player(0)
 
@@ -159,6 +170,68 @@ func test_counter_tie_break_is_configurable() -> void:
 
 	targets.set_counter_tie_break(TargetMode.CounterTieBreak.LOWEST_ID)
 	assert_eq(targets.select_target(_player(0)), 2, "ID の小さい方を選ぶ")
+
+
+func test_counter_most_dangerous_tie_prefers_the_lowest_id() -> void:
+	_set_mode(0, TargetMode.Mode.COUNTER)
+	_player(4).current_target = 0
+	_player(2).current_target = 0
+	_player(2).danger_level = DangerLevel.Level.DANGER
+	_player(4).danger_level = DangerLevel.Level.DANGER
+	targets.set_counter_tie_break(TargetMode.CounterTieBreak.MOST_DANGEROUS)
+
+	assert_eq(targets.select_target(_player(0)), 2, "同じ危険度なら ID の小さい方")
+
+
+func test_counter_random_tie_break_picks_only_attackers() -> void:
+	_set_mode(0, TargetMode.Mode.COUNTER)
+	_player(2).current_target = 0
+	_player(4).current_target = 0
+	targets.set_counter_tie_break(TargetMode.CounterTieBreak.RANDOM)
+
+	var chosen: Dictionary = {}
+	for _attempt in range(30):
+		chosen[targets.select_target(_player(0))] = true
+
+	assert_eq_deep(chosen.keys().filter(func(id: int) -> bool: return id not in [2, 4]), [])
+	assert_eq(chosen.size(), 2, "狙ってきた 2 人の両方が選ばれうる")
+
+
+func test_counter_tie_break_can_be_read_back() -> void:
+	targets.set_counter_tie_break(TargetMode.CounterTieBreak.LOWEST_ID)
+
+	assert_eq(targets.get_counter_tie_break(), TargetMode.CounterTieBreak.LOWEST_ID)
+
+
+func test_attackers_of_lists_only_living_attackers() -> void:
+	_player(1).current_target = 0
+	_player(3).current_target = 0
+	_player(4).current_target = 2
+	manager.eliminate_player(3)
+
+	var ids: Array = targets.get_attackers_of(0).map(
+		func(player: BattlePlayerState) -> int: return player.player_id
+	)
+
+	assert_eq_deep(ids, [1])
+
+
+# --- 候補の控え（#55 の最適化） ----------------------------------------------
+
+
+func test_candidate_index_skips_the_player_itself() -> void:
+	# 控えは 1 巡で使い回すので、自分を飛ばした数え方が 1 人ずつ候補配列を
+	# 作っていたときと同じ並びになっていることを見る（同じ乱数で同じ相手になる）。
+	var player: BattlePlayerState = _player(2)
+	targets._refresh_targetable()
+
+	var picked: Array = []
+	for index in range(4):
+		picked.append(targets._candidate_at(player, index).player_id)
+
+	assert_eq_deep(picked, [0, 1, 3, 4])
+	assert_null(targets._candidate_at(player, 4), "候補の数を超えたら null")
+	assert_null(targets._candidate_at(player, -1), "負の位置は null（末尾を返さない）")
 
 
 # --- Manual Target（要件定義 §52） ------------------------------------------

@@ -287,12 +287,12 @@ func _select_counter(player: BattlePlayerState) -> int:
 	return attackers[_rng.randi_range(0, attackers.size() - 1)].player_id
 
 
+# 候補は控えと同じく ID の小さい順に並んでいるので、同じ危険度なら先に見た
+# （ID の小さい）方が残る。選択を決定論的にするため。
 func _select_most_dangerous_of(candidates: Array[BattlePlayerState]) -> int:
 	var best: BattlePlayerState = candidates[0]
 	for candidate in candidates:
 		if candidate.danger_level > best.danger_level:
-			best = candidate
-		elif candidate.danger_level == best.danger_level and candidate.player_id < best.player_id:
 			best = candidate
 	return best.player_id
 
