@@ -176,10 +176,27 @@ func _on_pause_action(action: PauseMenu.Action) -> void:
 		PauseMenu.Action.RESTART:
 			SceneRouter.restart_battle()
 		PauseMenu.Action.SETTINGS:
-			# Settings の中身は #52。ここでは開く口だけ用意しておく。
-			get_tree().change_scene_to_file("res://scenes/settings/settings.tscn")
+			_open_settings()
 		PauseMenu.Action.QUIT_TO_MENU:
 			SceneRouter.quit_to_menu()
+
+
+## Settings を Battle の上に重ねて開く（要件定義 §96）。
+##
+## Scene を切り替えると Battle が破棄されるので、Pause したまま重ねる。
+## 閉じたら Pause メニューへ戻る。
+func _open_settings() -> void:
+	var overlay: Node = SceneRouter.open_settings(self)
+	if overlay == null:
+		return
+	_pause_menu.visible = false
+	if not overlay.tree_exited.is_connected(_on_settings_closed):
+		overlay.tree_exited.connect(_on_settings_closed)
+
+
+func _on_settings_closed() -> void:
+	if _pause_menu != null and is_inside_tree():
+		_pause_menu.visible = _paused
 
 
 func _on_battle_finished() -> void:
@@ -200,11 +217,26 @@ func _build_input() -> void:
 
 func _on_opponent_selected(player_id: int) -> void:
 	# Target にするかどうかは Battle Layer が決める（要件定義 §53）。
-	_runner.get_target_manager().set_manual_target(VIEWER_ID, player_id)
+	var targets: TargetManager = _runner.get_target_manager()
+	if not targets.set_manual_target(VIEWER_ID, player_id):
+		return
+	# 次の step() を待たずに反映する。待つと、その間の攻撃が前の Target へ飛ぶ。
+	targets.update_target(VIEWER_ID)
+	# 今の Target を選び直した場合は target_changed が出ないので、HUD を読み直させる。
+	_hud.refresh_target()
 
 
 func _on_command_pressed(command: GameCommand.Command) -> void:
-	var session: PuzzleSession = _viewer_session()
+	# Settings を開いている間は、下の Battle へ操作を渡さない。
+	if SceneRouter.is_settings_open():
+		return
+
+	if command == GameCommand.Command.PAUSE:
+		set_paused(not _paused)
+		return
+
+	# 止めている間は盤面を動かさない（要件定義 §96）。
+	var session: PuzzleSession = null if _paused else _viewer_session()
 	if session == null:
 		return
 
@@ -223,8 +255,6 @@ func _on_command_pressed(command: GameCommand.Command) -> void:
 			session.rotate(RotationSystem.Direction.CLOCKWISE)
 		GameCommand.Command.HOLD:
 			session.hold()
-		GameCommand.Command.PAUSE:
-			set_paused(not _paused)
 
 
 func _on_command_released(command: GameCommand.Command) -> void:
