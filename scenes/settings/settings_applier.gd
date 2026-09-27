@@ -41,10 +41,12 @@ static func apply_gameplay(settings: UserSettings, rules: GameRules) -> int:
 
 ## Audio の音量を反映する（要件定義 §97 / §100）。
 ##
-## BGM / SE の Bus が無い環境（Bus Layout を置く前）では Master だけ効かせる。
+## BGM / SE の Bus は無ければここで作る（Bus Layout のファイルを置かないため）。
 static func apply_audio(settings: UserSettings) -> void:
 	if settings == null:
 		return
+	# Boot 時点では BGM / SE の Bus がまだ無い。先に作っておかないと音量が効かない。
+	AudioBusSetup.ensure_buses()
 	_set_bus_volume("Master", settings.master_volume)
 	_set_bus_volume(BGM_BUS, settings.bgm_volume)
 	_set_bus_volume(SE_BUS, settings.se_volume)

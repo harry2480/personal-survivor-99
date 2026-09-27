@@ -149,3 +149,19 @@ func test_selected_target_takes_effect_before_the_next_step() -> void:
 
 	assert_eq(viewer.current_target, target_id, "選んだ時点で Target が切り替わる（要件定義 §52）")
 	assert_eq(scene.get_node("BattleHud").get_value("target"), "P%d" % target_id, "HUD も選んだ相手を出す")
+
+
+func test_defeat_sound_plays_once_when_the_viewer_loses() -> void:
+	# 自分の KO で Defeat が鳴る。決着の処理で重ねて鳴らさない（#53）。
+	SceneRouter.current_state = GameState.State.PLAYING
+	var scene: Node = _new_battle_scene()
+	await wait_frames(3)
+	var audio: AudioManager = scene.get_audio_manager()
+
+	scene.get_runner().get_manager().eliminate_player(scene.VIEWER_ID)
+	audio._process(AudioManager.THROTTLE_SEC * 2.0)
+	scene._on_battle_finished()
+
+	assert_eq(audio.get_played_count(AudioManager.Event.DEFEAT), 1, "Defeat は 1 回だけ")
+	assert_eq(audio.get_played_count(AudioManager.Event.VICTORY), 0, "負けたら Victory は鳴らない")
+	SceneRouter.current_state = GameState.State.MAIN_MENU
