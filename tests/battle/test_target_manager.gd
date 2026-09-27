@@ -80,17 +80,6 @@ func test_invalid_id_is_handled_safely() -> void:
 	assert_false(targets.set_manual_target(0, 999), "存在しない相手の指定も拒否する")
 
 
-func test_candidates_exclude_self_and_dead_players() -> void:
-	manager.eliminate_player(3)
-
-	var ids: Array = targets.get_candidates(_player(1)).map(
-		func(player: BattlePlayerState) -> int: return player.player_id
-	)
-
-	assert_eq_deep(ids, [0, 2, 4])
-	assert_eq(targets.get_candidates(null).size(), 0, "null なら空")
-
-
 func test_dead_player_does_not_pick_a_target() -> void:
 	manager.eliminate_player(0)
 
