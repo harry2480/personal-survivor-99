@@ -39,8 +39,14 @@ scripts/verify-godot.sh   # import + 起動検証（CI と同じ）
 scripts/run-tests.sh      # GUT の自動テスト
 ```
 
-**Godot はスクリプトエラーが出ても終了コード 0 を返す。**終了コードだけで判断せず、
-出力に `ERROR` / `SCRIPT ERROR` / `WARNING` が無いことまで見る（スクリプト側で走査済み）。
+ドキュメントだけの変更でも省略しない。
+
+**Godot はスクリプトエラーが出ても終了コード 0 を返す。**終了コードだけで判断しない。
+
+- `verify-godot.sh` は出力の `ERROR` / `SCRIPT ERROR` / `WARNING` を走査して失敗させる
+- `run-tests.sh` が失敗させるのは、テストの失敗と終了時の解放漏れ（`resources still in use at exit`）だけ。
+  テストはわざと `push_error` / `push_warning` を起こすので、`ERROR` / `WARNING` の走査はしていない。
+  テストの出力に、意図していない `SCRIPT ERROR` が増えていないかは目で見る
 
 `scripts/static-check.sh` は gdtoolkit を使う。未導入なら
 `pip install -r ci/requirements-static-check.txt`、または `SKIP_GDTOOLKIT=1` で省略。
@@ -106,7 +112,7 @@ Presentation Layer  →  Battle Layer  →  Game Core Layer
 
 ## PR の出し方
 
-1. 変更内容を確認する（`git status` / `git diff`）
+1. 変更内容を確認する（`git status --short` / `git diff HEAD`。未追跡ファイルは中身も見る）
 2. 目的（Why）を言語化する。「誰の」「どの困りごと」を解消するのか
 3. `main` にいるなら `feature/*` などのブランチを作る
 4. 上記の必須チェックを通す
