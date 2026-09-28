@@ -9,7 +9,9 @@ extends SceneTree
 
 const SEEDS: Array[int] = [20260922, 1, 999]
 const PLAYER_COUNT: int = 99
-const TIME_LIMIT_SEC: float = 120.0
+## 実際の Battle と同じ上限まで進める。途中で止めると、その後の脱落や時間切れの
+## 畳み方の違いを見落とす。
+const TIME_LIMIT_SEC: float = CpuBattleRunner.DEFAULT_TIME_LIMIT_SEC
 const FRAME_DELTA: float = 1.0 / 60.0
 const FRAMES_PER_DROP: int = 10
 const SHOWN_RANKS: int = 10
@@ -49,5 +51,7 @@ func _run(battle_seed: int) -> String:
 	for result in runner.get_results():
 		if result.rank <= SHOWN_RANKS:
 			ranks.append("%d:P%d" % [result.rank, result.player_id])
+	# 時間切れで畳んだのか、Top Out で決着したのかも比べる。
+	var ending: String = "時間切れ" if runner.is_timed_out() else "決着"
 	runner.dispose()
-	return " ".join(ranks)
+	return "%s（%s）" % [" ".join(ranks), ending]
