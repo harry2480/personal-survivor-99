@@ -19,7 +19,10 @@ description: main ブランチに戻ってリモートと同期する
 
 3. **main へ切り替え**: `git checkout main`
 
-4. **最新化**: `git pull origin main`
+4. **最新化**: `git pull --ff-only origin main`
+
+   fast-forward できない（ローカルの `main` が `origin/main` と分岐している）場合は、
+   ここで止めてユーザーに報告する。`main` 上に merge commit を作ると、`main` への直接 commit になる。
 
 5. **完了報告**: 切り替え完了と、`main` の最新コミットを報告する。
 
