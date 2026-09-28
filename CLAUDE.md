@@ -21,6 +21,7 @@ scripts/verify-godot.sh         # import + 起動検証（CI と同じ）
 scripts/run-tests.sh            # GUT の自動テストを headless 実行
 scripts/coverage.sh             # カバレッジ計測（LCOV。gd-tools が必要）
 scripts/export-macos.sh         # macOS Export Validation（Export Templates が必要）
+scripts/package-macos.sh        # 配布物の作成（.app → .zip → Checksum）
 scripts/benchmark-cpu.sh        # CPU の配置探索の計測（CI では動かさない）
 scripts/benchmark-cpu-strength.sh  # Strength ごとの CPU の強さの計測（CI では動かさない）
 scripts/setup-loop-labels.sh   # Loop 用ラベルの作成・更新
@@ -150,3 +151,6 @@ CI も同じスクリプトを使う。
 - docs/スタイルガイド.md — 表記・UI の統一ルール
 - docs/loop-engineering.md — Loop運用と安全境界
 - docs/リポジトリ設定手順.md — ブランチ保護 / auto-merge（管理者作業。AI は変更しない）
+- docs/リリース手順.md — バージョンの上げ方・配布物の作り方・Release の出し方
+- docs/リリース前検証チェックリスト.md — MVP 受入条件と実機検証の確認表
+- docs/性能計測と最適化.md — 計測結果・最適化の判断・GDExtension の採否
