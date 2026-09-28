@@ -16,6 +16,13 @@ const FRAMES_PER_DROP: int = 10
 
 ## 何試合ごとに記録するか。
 const REPORT_INTERVAL: int = 10
+## 判定の起点にする試合数。最初の試合で確保されるぶん（キャッシュなど）を外す。
+const BASELINE_BATTLES: int = 10
+## 起点から最後までに許す増分。試合数に比例させない（1 試合ごとのリークを見逃さない）。
+const ALLOWED_MEMORY_GROWTH_MB: float = 0.5
+const ALLOWED_OBJECT_GROWTH: int = 2
+
+var _baseline: Dictionary = {}
 
 
 func _init() -> void:
@@ -25,14 +32,40 @@ func _init() -> void:
 	print("|---|---|---|---|")
 
 	_report(0)
+	var latest: Dictionary = {}
 	for index in range(BATTLES):
 		_run_battle(SEED + index)
 		if (index + 1) % REPORT_INTERVAL == 0:
-			_report(index + 1)
+			latest = _report(index + 1)
+			if index + 1 == BASELINE_BATTLES:
+				_baseline = latest
 
 	print("")
-	print("試合数が増えてもメモリと Object 数が横ばいなら、リークしていない。")
-	quit()
+	quit(0 if _judge(latest) else 1)
+
+
+# 起点（BASELINE_BATTLES 試合目）から最後までの増分で合否を決める。
+func _judge(latest: Dictionary) -> bool:
+	var memory_growth: float = latest.memory_mb - _baseline.memory_mb
+	var object_growth: int = latest.objects - _baseline.objects
+	var passed: bool = (
+		memory_growth <= ALLOWED_MEMORY_GROWTH_MB and object_growth <= ALLOWED_OBJECT_GROWTH
+	)
+	print(
+		(
+			"判定: %s（%d → %d 試合で メモリ %+.2f MB（許容 %.2f）/ Object %+d（許容 %d））"
+			% [
+				"合格" if passed else "不合格",
+				BASELINE_BATTLES,
+				BATTLES,
+				memory_growth,
+				ALLOWED_MEMORY_GROWTH_MB,
+				object_growth,
+				ALLOWED_OBJECT_GROWTH,
+			]
+		)
+	)
+	return passed
 
 
 func _run_battle(battle_seed: int) -> void:
@@ -55,15 +88,11 @@ func _run_battle(battle_seed: int) -> void:
 	runner.dispose()
 
 
-func _report(battles: int) -> void:
-	print(
-		(
-			"| %d | %.2f | %d | %d |"
-			% [
-				battles,
-				float(Performance.get_monitor(Performance.MEMORY_STATIC)) / 1048576.0,
-				int(Performance.get_monitor(Performance.OBJECT_COUNT)),
-				int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)),
-			]
-		)
-	)
+func _report(battles: int) -> Dictionary:
+	var sample: Dictionary = {
+		"memory_mb": float(Performance.get_monitor(Performance.MEMORY_STATIC)) / 1048576.0,
+		"objects": int(Performance.get_monitor(Performance.OBJECT_COUNT)),
+		"orphans": int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)),
+	}
+	print("| %d | %.2f | %d | %d |" % [battles, sample.memory_mb, sample.objects, sample.orphans])
+	return sample
