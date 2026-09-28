@@ -179,9 +179,12 @@ func test_simulation_keeps_the_frame_budget() -> void:
 	# 要件定義 §105: 99 人戦で平均 60 FPS 以上。描画を含まない Simulation の
 	# 時間がここで予算（16.6 ms）を食い潰していないことを見る。
 	# 実時間を測るので、処理が数倍遅くなるカバレッジ計測では意味がなく、飛ばす。
+	#
+	# #55 の最適化後は 1 フレーム 0.8 ms 程度。描画のために予算を空けておきたいので、
+	# 予算の 1/4（4.15 ms）を超えたら失敗させる（性能の後退を検知するため）。
 	var runner: CpuBattleRunner = _run_scaling_case(99)
 
-	assert_lt(runner.get_frame_stats().average_msec, 16.6, "99 人でも 1 フレームの予算に収まる")
+	assert_lt(runner.get_frame_stats().average_msec, 4.15, "99 人でも 1 フレームの予算の 1/4 未満")
 
 
 # --- Human を混ぜた Runner --------------------------------------------------
