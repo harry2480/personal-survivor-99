@@ -152,7 +152,10 @@ func bind_session(session: PuzzleSession) -> void:
 
 	var on_locked: Callable = func(_type: int) -> void: play(Event.LOCK)
 	var on_held: Callable = func(_type: int) -> void: play(Event.HOLD)
-	var on_cleared: Callable = func(result: LineClearResult) -> void: _on_lines_cleared(result)
+	# Session を掴むと Session 自身の signal と循環参照になるので、Scoring だけを掴む。
+	var scoring: ScoringState = session.get_scoring()
+	var on_cleared: Callable = func(result: LineClearResult) -> void:
+		_on_lines_cleared(result, scoring)
 	var on_garbage: Callable = func(_lines: int) -> void: play(Event.GARBAGE_RECEIVE)
 	var on_attack: Callable = func(_amount: int, _context: AttackContext) -> void:
 		play(Event.GARBAGE_SEND)
@@ -167,8 +170,8 @@ func bind_session(session: PuzzleSession) -> void:
 ## Battle の出来事を SE へ繋ぐ（要件定義 §100）。
 func bind_battle(ko: KoSystem, targets: TargetManager, viewer_id: int) -> void:
 	if ko != null:
-		var on_ko: Callable = func(victim: int, attacker: int) -> void:
-			_on_player_ko(victim, attacker, viewer_id)
+		var on_ko: Callable = func(victim: int, _attacker: int) -> void:
+			_on_player_ko(victim, viewer_id)
 		_connect(ko, "player_ko", on_ko)
 
 	if targets != null:
@@ -224,17 +227,19 @@ func _find_free_player() -> AudioStreamPlayer:
 	return null
 
 
-func _on_lines_cleared(result: LineClearResult) -> void:
-	if result.line_count >= HIGH_VALUE_LINES or result.type != LineClear.Type.NONE:
+func _on_lines_cleared(result: LineClearResult, scoring: ScoringState) -> void:
+	# lines_cleared は Scoring を更新した後に来るので、この Lock の T-Spin / Combo が読める。
+	if result.line_count >= HIGH_VALUE_LINES or scoring.was_t_spin():
 		play(Event.HIGH_VALUE_CLEAR)
 	else:
 		play(Event.LINE_CLEAR)
+	if scoring.get_combo_count() >= 2:
+		play(Event.COMBO)
 
 
-func _on_player_ko(victim: int, attacker: int, viewer_id: int) -> void:
+func _on_player_ko(victim: int, viewer_id: int) -> void:
+	# 自分が倒れたら Defeat、それ以外（自分が倒した / 他人同士）は KO。
 	if victim == viewer_id:
 		play(Event.DEFEAT)
-	elif attacker == viewer_id:
-		play(Event.KO)
 	else:
 		play(Event.KO)

@@ -88,6 +88,64 @@ func test_clearing_lines_plays_a_sound() -> void:
 	assert_gt(cleared, 0, "Line Clear で鳴る")
 
 
+func test_single_line_clear_is_not_high_value() -> void:
+	# 1 行消しは通常の Line Clear。High-value は 4 行以上か T-Spin だけ。
+	var session: PuzzleSession = _new_session()
+	audio.bind_session(session)
+	for x in range(Board.WIDTH):
+		session.get_board().set_cell(x, Board.TOTAL_HEIGHT - 1, Piece.Type.I)
+
+	session.hard_drop()
+
+	assert_eq(audio.get_played_count(AudioManager.Event.LINE_CLEAR), 1, "1 行消しは Line Clear")
+	assert_eq(audio.get_played_count(AudioManager.Event.HIGH_VALUE_CLEAR), 0, "High-value ではない")
+
+
+func test_consecutive_clears_play_combo() -> void:
+	var session: PuzzleSession = _new_session()
+	audio.bind_session(session)
+	var bottom: int = Board.TOTAL_HEIGHT - 1
+
+	for _clear in range(2):
+		for x in range(Board.WIDTH):
+			session.get_board().set_cell(x, bottom, Piece.Type.I)
+		audio._process(AudioManager.THROTTLE_SEC * 2.0)
+		session.hard_drop()
+		# 置いた Piece は消えずに残るので、次の Clear の邪魔にならないよう片付ける。
+		session.get_board().clear()
+
+	assert_eq(audio.get_played_count(AudioManager.Event.COMBO), 1, "2 連続目の Clear で Combo")
+
+
+func test_viewer_ko_plays_defeat_and_others_play_ko() -> void:
+	var manager := BattleManager.new()
+	manager.setup(1, 3, SEED)
+	var ko := KoSystem.new(manager, KoAttribution.new())
+	audio.bind_battle(ko, null, 1)
+
+	ko.player_ko.emit(2, 1)
+	audio._process(AudioManager.THROTTLE_SEC * 2.0)
+	ko.player_ko.emit(1, 3)
+
+	assert_eq(audio.get_played_count(AudioManager.Event.KO), 1, "相手が倒れたら KO")
+	assert_eq(audio.get_played_count(AudioManager.Event.DEFEAT), 1, "自分が倒れたら Defeat")
+
+
+func test_applying_settings_reaches_the_audio_buses() -> void:
+	# Boot で設定を反映する時点では Battle がまだ無い。Bus が無くても音量が効くこと。
+	AudioServer.remove_bus(AudioServer.get_bus_index(AudioBusSetup.SE_BUS))
+	var settings := UserSettings.new()
+	settings.se_volume = 0.0
+
+	SettingsApplier.apply_audio(settings)
+
+	var index: int = AudioServer.get_bus_index(AudioBusSetup.SE_BUS)
+	assert_gte(index, 0, "SE の Bus がある")
+	assert_true(AudioServer.is_bus_mute(index), "SE の音量 0 が効く")
+
+	SettingsApplier.apply_audio(UserSettings.new())
+
+
 func test_receiving_garbage_plays_a_sound() -> void:
 	var session: PuzzleSession = _new_session()
 	audio.bind_session(session)

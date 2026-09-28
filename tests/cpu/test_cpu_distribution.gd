@@ -421,6 +421,29 @@ func test_only_garbage_that_lands_is_attributed() -> void:
 		assert_eq(from_source, 0 if defended else 3, "捌かれたら 0 行、積まれたら 3 行")
 
 
+func test_garbage_waiting_at_promotion_is_attributed_once() -> void:
+	# Detailed へ昇格すると受信待ちの Garbage は盤面へ移る。そのぶんは昇格時に 1 回だけ記録し、
+	# 降格しても古い送り手へもう一度 KO を付けない。
+	var runner: CpuBattleRunner = _new_runner(_spread_distribution(), 3)
+	var players: Array[BattlePlayerState] = runner.get_manager().get_players()
+	var source: BattlePlayerState = players[0]
+	var victim_id: int = players[1].player_id
+	source.current_target = victim_id
+	runner.get_cpu_manager().set_detailed_limit(1)
+
+	runner._send_attack(source.player_id, 3)
+	assert_true(runner.get_cpu_manager().promote(victim_id), "昇格できる")
+	runner.step(FRAME)
+	var recorded: int = runner._attribution.get_history(victim_id).size()
+
+	assert_gt(recorded, 0, "昇格した時点で受信待ちのぶんを記録する")
+	assert_true(runner._pending_garbage.get(victim_id, []).is_empty(), "列は空になる")
+
+	runner.get_cpu_manager().demote(victim_id)
+	runner.step(FRAME)
+	assert_eq(runner._attribution.get_history(victim_id).size(), recorded, "降格しても二重に記録しない")
+
+
 func test_simultaneous_top_out_counts_only_real_eliminations() -> void:
 	# 最後の 2 体が同時に Top Out しても、脱落が成立するのは 1 体（勝者は残る）。
 	var runner: CpuBattleRunner = _new_runner(_spread_distribution(), 2)

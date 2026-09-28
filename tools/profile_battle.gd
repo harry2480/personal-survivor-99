@@ -16,7 +16,6 @@ const FRAMES_PER_DROP: int = 10
 const FRAME_BUDGET_MS: float = 1000.0 / 60.0
 
 var _totals: Dictionary = {}
-var _counts: Dictionary = {}
 
 
 func _init() -> void:
@@ -62,17 +61,43 @@ func _measure() -> void:
 		if manager.is_finished():
 			break
 
+		# CpuBattleRunner.step() と同じ順に、同じ処理を部位ごとに測る。
+		# Attack を送らないと Garbage も KO も起きず、実際の Battle と違う負荷になる。
+		# Human の操作も step() と同じくフレームの負荷に含める。
+		var attacks: Dictionary = {}
+		var frame_ms: float = 0.0
 		if frame % FRAMES_PER_DROP == 0:
-			for human in runner.get_human_players():
-				if human.alive and human.session != null and not human.session.is_over():
-					human.session.hard_drop()
-
-		_time("battle_update", func() -> void: manager.update(FRAME_DELTA))
-		_time("target_update", func() -> void: targets.update_all_targets())
-		_time("cpu_update", func() -> void: scheduler.update(FRAME_DELTA))
-		_time("cpu_indicators", func() -> void: _read_indicators(manager, cpus))
+			frame_ms += _time("human_input", func() -> void: _drop_humans(runner))
+		runner._elapsed_sec += FRAME_DELTA
+		frame_ms += _time("battle_update", func() -> void: manager.update(FRAME_DELTA))
+		frame_ms += _time(
+			"cpu_update", func() -> void: attacks.merge(scheduler.update(FRAME_DELTA))
+		)
+		frame_ms += _time("battle_sync", func() -> void: _sync_before_targeting(runner))
+		frame_ms += _time("target_update", func() -> void: targets.update_all_targets())
+		frame_ms += _time("attack_dispatch", func() -> void: _dispatch(runner, attacks))
+		frame_ms += _time("cpu_indicators", func() -> void: _read_indicators(manager, cpus))
+		# 負荷に応じた分散の段階の切り替えも step() と同じく働かせる。
+		scheduler.observe_frame_time(frame_ms)
 
 	runner.dispose()
+
+
+func _drop_humans(runner: CpuBattleRunner) -> void:
+	for human in runner.get_human_players():
+		if human.alive and human.session != null and not human.session.is_over():
+			human.session.hard_drop()
+
+
+func _sync_before_targeting(runner: CpuBattleRunner) -> void:
+	runner._attribute_applied_garbage()
+	runner._sync_battle_state()
+
+
+func _dispatch(runner: CpuBattleRunner, attacks: Dictionary) -> void:
+	runner._dispatch_attacks(attacks)
+	runner._sync_battle_state()
+	runner._eliminate_topped_out()
 
 
 func _read_indicators(manager: BattleManager, cpus: CpuManager) -> void:
@@ -82,9 +107,9 @@ func _read_indicators(manager: BattleManager, cpus: CpuManager) -> void:
 			cpus.get_indicators(player.player_id)
 
 
-func _time(key: String, body: Callable) -> void:
+func _time(key: String, body: Callable) -> float:
 	var started: int = Time.get_ticks_usec()
 	body.call()
 	var elapsed_ms: float = float(Time.get_ticks_usec() - started) / 1000.0
 	_totals[key] = _totals.get(key, 0.0) + elapsed_ms
-	_counts[key] = _counts.get(key, 0) + 1
+	return elapsed_ms
