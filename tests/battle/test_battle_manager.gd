@@ -203,6 +203,21 @@ func test_simultaneous_top_out_keeps_the_winner_alive() -> void:
 	assert_signal_emitted_with_parameters(manager, "battle_finished", [1])
 
 
+func test_players_without_board_simulation_are_not_advanced() -> void:
+	# Lightweight の CPU（simulates_board = false）の盤面は使わないので進めない。
+	# 盤面が Top Out していても、ここでは脱落させない（脱落は CPU 側の指標で決まる）。
+	manager.setup(1, 2, SEED)
+	var lightweight: BattlePlayerState = manager.get_player(1)
+	lightweight.simulates_board = false
+	_top_out(lightweight.session)
+	_top_out(manager.get_player(2).session)
+
+	manager.update(0.0)
+
+	assert_true(lightweight.alive, "盤面を進めない Player は盤面の Top Out で脱落しない")
+	assert_false(manager.get_player(2).alive, "盤面を進める Player は脱落する")
+
+
 func test_elimination_after_finishing_is_ignored() -> void:
 	manager.setup(1, 1, SEED)
 	manager.eliminate_player(0)

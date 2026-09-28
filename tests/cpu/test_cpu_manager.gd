@@ -145,6 +145,18 @@ func test_promotion_attaches_a_board_state() -> void:
 	assert_not_null(manager.get_player(1).get_board(), "Board State を持つ")
 
 
+func test_only_detailed_cpus_simulate_the_board() -> void:
+	# Lightweight の盤面は Battle Layer に進めさせない（#55）。Detailed になったら進める。
+	assert_false(manager.get_player(1).simulates_board, "登録直後の Lightweight は進めない")
+	assert_true(manager.get_player(0).simulates_board, "Human は進める")
+
+	cpus.promote(1, "test")
+	assert_true(manager.get_player(1).simulates_board, "Detailed になったら進める")
+
+	cpus.demote(1, "test")
+	assert_false(manager.get_player(1).simulates_board, "Lightweight に戻ったら止める")
+
+
 func test_promotion_keeps_the_incoming_garbage() -> void:
 	# 周期の途中で昇格しても、受信待ちの Garbage を落とさない。
 	cpus.receive_garbage(1, 3)

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '成果物名に付けるバージョン（未指定なら project.godot の config/version）'
+        description: '成果物名に付けるバージョン（未指定なら project.godot の config/version。指定するなら同じ値）'
         required: false
         type: string
 
@@ -53,15 +53,21 @@ jobs:
           if [ -z "$version" ]; then
             version="$(grep -E '^config/version=' project.godot | head -1 | cut -d'"' -f2)"
           fi
+          # Tag 名と手動入力は外から決まる値なので、形式を限ってから使う。
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'; then
+            echo "バージョンの形式が不正です: ${version}（例: 0.2.0）" >&2
+            exit 1
+          fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "バージョン: ${version}"
 
       # Production Build → Package → Checksum をまとめて行う。
+      # 値はシェルの本文へ埋め込まず env で渡す（Tag 名によるコマンド注入を防ぐ）。
       - name: Package
-        run: |
-          GODOT_BIN="${{ steps.godot.outputs.godot-bin }}" \
-          RELEASE_VERSION="${{ steps.version.outputs.version }}" \
-          scripts/package-macos.sh
+        env:
+          GODOT_BIN: ${{ steps.godot.outputs.godot-bin }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: scripts/package-macos.sh
 
       - name: 成果物を保存
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -73,10 +79,10 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      # Tag から流したときだけ Release を作る。
-      # 手動実行（workflow_dispatch）では成果物の確認までにとどめる。
+      # Tag の push から流したときだけ Release を作る。
+      # 手動実行（workflow_dispatch）では、Tag を指定して流しても成果物の確認までにとどめる。
       - name: GitHub Release を作る
-        if: github.ref_type == 'tag'
+        if: github.event_name == 'push' && github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
