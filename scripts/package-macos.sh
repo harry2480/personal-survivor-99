@@ -12,7 +12,8 @@
 #   GODOT_BIN                   Godot 実行ファイルのパス（未指定なら自動探索）
 #   SKIP_GODOT_VERSION_CHECK=1  .godot-version との一致確認を省略する
 #   GODOT_TEMPLATES_DIR         Export Templates の場所
-#   RELEASE_VERSION             成果物名に付けるバージョン（未指定なら project.godot から）
+#   RELEASE_VERSION             成果物名に付けるバージョン（未指定なら project.godot から）。
+#                               指定する場合は project.godot の config/version と一致させる
 #   PACKAGE_DIR                 出力先（既定: dist）
 set -euo pipefail
 
@@ -28,12 +29,17 @@ package_dir="${PACKAGE_DIR:-dist}"
 app_path="${package_dir}/${app_name}.app"
 
 # バージョンは project.godot の config/version を唯一の出どころにする。
-version="${RELEASE_VERSION:-}"
-if [ -z "$version" ]; then
-  version="$(grep -E '^config/version=' project.godot | head -1 | cut -d'"' -f2)"
-fi
-if [ -z "$version" ]; then
+# .app の Info.plist（export_presets.cfg を空欄にして config/version へ任せている）と
+# 成果物名がずれないよう、RELEASE_VERSION を指定するなら同じ値でなければ止める。
+project_version="$(grep -E '^config/version=' project.godot | head -1 | cut -d'"' -f2)"
+if [ -z "$project_version" ]; then
   echo "バージョンを特定できませんでした（project.godot の config/version）" >&2
+  exit 1
+fi
+version="${RELEASE_VERSION:-$project_version}"
+if [ "$version" != "$project_version" ]; then
+  echo "RELEASE_VERSION（${version}）が project.godot の config/version（${project_version}）と違います。" >&2
+  echo "先に config/version を上げる PR を main へ入れてください（docs/リリース手順.md 3.）。" >&2
   exit 1
 fi
 
@@ -52,10 +58,10 @@ echo
 echo
 
 # 前回の成果物が残っていると、Export が失敗しても成功に見えてしまう。
-# 消すのは自分が作った出力先だけに限定する。
-if [ -e "$package_dir" ]; then
-  find "$package_dir" -mindepth 1 -delete
-fi
+# 消すのはこのスクリプトが作るファイルだけにする。PACKAGE_DIR は外から変えられるので、
+# 出力先の中身をまとめて消すと、"." などを渡されたときにリポジトリごと消えてしまう。
+rm -rf -- "$app_path"
+rm -f -- "$zip_path" "$checksum_path"
 mkdir -p "$package_dir"
 
 # Export は import 済みのプロジェクトを前提にする。
