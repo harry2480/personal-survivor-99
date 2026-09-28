@@ -61,15 +61,13 @@ func _measure() -> void:
 		if manager.is_finished():
 			break
 
-		if frame % FRAMES_PER_DROP == 0:
-			for human in runner.get_human_players():
-				if human.alive and human.session != null and not human.session.is_over():
-					human.session.hard_drop()
-
 		# CpuBattleRunner.step() と同じ順に、同じ処理を部位ごとに測る。
 		# Attack を送らないと Garbage も KO も起きず、実際の Battle と違う負荷になる。
+		# Human の操作も step() と同じくフレームの負荷に含める。
 		var attacks: Dictionary = {}
 		var frame_ms: float = 0.0
+		if frame % FRAMES_PER_DROP == 0:
+			frame_ms += _time("human_input", func() -> void: _drop_humans(runner))
 		runner._elapsed_sec += FRAME_DELTA
 		frame_ms += _time("battle_update", func() -> void: manager.update(FRAME_DELTA))
 		frame_ms += _time(
@@ -83,6 +81,12 @@ func _measure() -> void:
 		scheduler.observe_frame_time(frame_ms)
 
 	runner.dispose()
+
+
+func _drop_humans(runner: CpuBattleRunner) -> void:
+	for human in runner.get_human_players():
+		if human.alive and human.session != null and not human.session.is_over():
+			human.session.hard_drop()
 
 
 func _sync_before_targeting(runner: CpuBattleRunner) -> void:
