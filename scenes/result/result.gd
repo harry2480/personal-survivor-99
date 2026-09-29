@@ -104,6 +104,8 @@ func _build() -> void:
 	back.text = "BACK TO MENU"
 	back.pressed.connect(back_to_menu)
 	root.add_child(back)
+	# フォーカスが無いと Keyboard / Controller で押せない。
+	back.grab_focus.call_deferred()
 
 
 func _build_statistics_label() -> Label:
