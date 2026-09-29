@@ -1,0 +1,406 @@
+# Project 99 の日本語表示（スタイルガイド §7: 文言は表示用のテーブルを経由する）。
+#
+# msgid は画面の組み立てに使う英語のキー。msgctxt は同じ英語で意味が違うものを分ける
+# （target_mode: Target モードの名前 / key: 操作方法のキーとボタンの名前）。
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: ja\n"
+
+msgid "PLAYERS"
+msgstr "人数"
+
+msgid "PLAY"
+msgstr "プレイ"
+
+msgid "SETTINGS"
+msgstr "設定"
+
+msgid "QUIT"
+msgstr "終了"
+
+msgid "CPU Difficulty"
+msgstr "CPU の強さ"
+
+msgid "Advanced"
+msgstr "詳細設定"
+
+msgid "Strength"
+msgstr "強さ"
+
+msgid "Min Strength"
+msgstr "最小の強さ"
+
+msgid "Max Strength"
+msgstr "最大の強さ"
+
+msgid "Variation"
+msgstr "ばらつき"
+
+msgid "reaction_time_sec"
+msgstr "反応時間（秒）"
+
+msgid "pieces_per_second"
+msgstr "1 秒の手数"
+
+msgid "misdrop_rate"
+msgstr "置きミス率"
+
+msgid "lookahead"
+msgstr "先読み数"
+
+msgid "beam_width"
+msgstr "探索の幅"
+
+msgid "placement_quality"
+msgstr "置き方の質"
+
+msgid "technique_usage"
+msgstr "技の使用率"
+
+msgid "garbage_skill"
+msgstr "おじゃま対応"
+
+msgid "target_skill"
+msgstr "狙い方の上手さ"
+
+msgid "hole_avoidance"
+msgstr "穴の避け方"
+
+msgid "surface_management"
+msgstr "地形の整え方"
+
+msgid "garbage_management"
+msgstr "おじゃまの処理"
+
+msgid "recovery_ability"
+msgstr "立て直す力"
+
+msgid "EASY"
+msgstr "かんたん"
+
+msgid "NORMAL"
+msgstr "ふつう"
+
+msgid "HARD"
+msgstr "むずかしい"
+
+msgid "VERY_HARD"
+msgstr "とてもむずかしい"
+
+msgid "EXTREME"
+msgstr "最強"
+
+msgid "CUSTOM"
+msgstr "カスタム"
+
+msgid "MACHINE"
+msgstr "マシン"
+
+msgid "HUMAN_LIKE"
+msgstr "人間らしい"
+
+msgid "BACK"
+msgstr "戻る"
+
+msgid "GAMEPLAY"
+msgstr "ゲームプレイ"
+
+msgid "DAS"
+msgstr "横移動の溜め"
+
+msgid "ARR"
+msgstr "横移動の間隔"
+
+msgid "SOFT DROP SPEED"
+msgstr "ソフトドロップ速度"
+
+msgid "GHOST"
+msgstr "ゴースト表示"
+
+msgid "AUDIO"
+msgstr "サウンド"
+
+msgid "MASTER"
+msgstr "全体の音量"
+
+msgid "BGM"
+msgstr "BGM の音量"
+
+msgid "SE"
+msgstr "効果音の音量"
+
+msgid "VIDEO"
+msgstr "画面"
+
+msgid "FULLSCREEN"
+msgstr "フルスクリーン"
+
+msgid "VSYNC"
+msgstr "垂直同期"
+
+msgid "FPS LIMIT"
+msgstr "FPS の上限"
+
+msgid "OFF"
+msgstr "なし"
+
+msgid "INPUT"
+msgstr "操作"
+
+msgid "DEAD ZONE"
+msgstr "スティックの遊び"
+
+msgid "KEYBOARD %d / CONTROLLER %d"
+msgstr "割り当て数　キーボード %d / コントローラー %d"
+
+msgid "PAUSED"
+msgstr "一時停止中"
+
+msgid "RESUME"
+msgstr "再開"
+
+msgid "RESTART"
+msgstr "やり直す"
+
+msgid "QUIT TO MENU"
+msgstr "メニューに戻る"
+
+msgid "VICTORY"
+msgstr "優勝！"
+
+msgid "RESULT"
+msgstr "結果"
+
+msgid "RANK"
+msgstr "順位"
+
+msgid "KO"
+msgstr "KO 数"
+
+msgid "LINES"
+msgstr "消したライン"
+
+msgid "QUAD"
+msgstr "4 ライン消し"
+
+msgid "T-SPIN"
+msgstr "T スピン"
+
+msgid "PERFECT CLEAR"
+msgstr "全消し"
+
+msgid "TIME"
+msgstr "時間"
+
+msgid "STRONGEST CPU BEATEN"
+msgstr "倒した最強 CPU"
+
+msgid "BACK TO MENU"
+msgstr "メニューに戻る"
+
+msgid "%.1f s"
+msgstr "%.1f 秒"
+
+msgid "TOTAL  GAMES %d / WINS %d / TOP10 %d / AVG RANK %.1f / KO %d"
+msgstr "通算　試合 %d / 優勝 %d / トップ10 %d / 平均順位 %.1f / KO %d"
+
+msgid "INCOMING"
+msgstr "受ける攻撃"
+
+msgid "TARGET"
+msgstr "狙っている相手"
+
+msgid "TARGET MODE"
+msgstr "狙い方"
+
+msgid "ATTACKERS"
+msgstr "狙ってくる人数"
+
+msgid "REMAINING"
+msgstr "残り人数"
+
+msgid "POWER"
+msgstr "攻撃倍率"
+
+msgid "OPENING"
+msgstr "開幕"
+
+msgid "EARLY"
+msgstr "序盤"
+
+msgid "MIDDLE"
+msgstr "中盤"
+
+msgid "LATE"
+msgstr "終盤"
+
+msgid "FINAL"
+msgstr "最終盤"
+
+msgid "DUEL"
+msgstr "一騎打ち"
+
+msgid "FINISHED"
+msgstr "終了"
+
+msgctxt "target_mode"
+msgid "RANDOM"
+msgstr "ランダム"
+
+msgctxt "target_mode"
+msgid "KO"
+msgstr "KO 狙い"
+
+msgctxt "target_mode"
+msgid "BADGE"
+msgstr "バッジ狙い"
+
+msgctxt "target_mode"
+msgid "COUNTER"
+msgstr "カウンター"
+
+msgctxt "target_mode"
+msgid "MANUAL"
+msgstr "手動"
+
+msgid "HOLD"
+msgstr "ホールド"
+
+msgid "NEXT"
+msgstr "ネクスト"
+
+msgid "KEYBOARD"
+msgstr "キーボード"
+
+msgid "CONTROLLER"
+msgstr "コントローラー"
+
+msgid "MOVE"
+msgstr "移動"
+
+msgid "SOFT DROP"
+msgstr "ソフトドロップ"
+
+msgid "HARD DROP"
+msgstr "ハードドロップ"
+
+msgid "ROTATE L / R"
+msgstr "左回転 / 右回転"
+
+msgid "TARGET RANDOM"
+msgstr "狙い方：ランダム"
+
+msgid "TARGET KO"
+msgstr "狙い方：KO 狙い"
+
+msgid "TARGET BADGE"
+msgstr "狙い方：バッジ狙い"
+
+msgid "TARGET COUNTER"
+msgstr "狙い方：カウンター"
+
+msgid "PAUSE"
+msgstr "一時停止"
+
+msgid "MENU OK"
+msgstr "メニュー：決定"
+
+msgid "MENU BACK"
+msgstr "メニュー：戻る"
+
+msgctxt "key"
+msgid "Left"
+msgstr "←"
+
+msgctxt "key"
+msgid "Right"
+msgstr "→"
+
+msgctxt "key"
+msgid "Up"
+msgstr "↑"
+
+msgctxt "key"
+msgid "Down"
+msgstr "↓"
+
+msgctxt "key"
+msgid "Space"
+msgstr "スペース"
+
+msgctxt "key"
+msgid "Escape"
+msgstr "Esc"
+
+msgctxt "key"
+msgid "Enter"
+msgstr "Enter"
+
+msgctxt "key"
+msgid "Kp Enter"
+msgstr "テンキー Enter"
+
+msgctxt "key"
+msgid "D-Pad Up"
+msgstr "十字キー↑"
+
+msgctxt "key"
+msgid "D-Pad Down"
+msgstr "十字キー↓"
+
+msgctxt "key"
+msgid "D-Pad Left"
+msgstr "十字キー←"
+
+msgctxt "key"
+msgid "D-Pad Right"
+msgstr "十字キー→"
+
+msgctxt "key"
+msgid "L Stick Up"
+msgstr "左スティック↑"
+
+msgctxt "key"
+msgid "L Stick Down"
+msgstr "左スティック↓"
+
+msgctxt "key"
+msgid "L Stick Left"
+msgstr "左スティック←"
+
+msgctxt "key"
+msgid "L Stick Right"
+msgstr "左スティック→"
+
+msgctxt "key"
+msgid "R Stick Up"
+msgstr "右スティック↑"
+
+msgctxt "key"
+msgid "R Stick Down"
+msgstr "右スティック↓"
+
+msgctxt "key"
+msgid "R Stick Left"
+msgstr "右スティック←"
+
+msgctxt "key"
+msgid "R Stick Right"
+msgstr "右スティック→"
+
+msgctxt "key"
+msgid "L Stick Press"
+msgstr "左スティック押し込み"
+
+msgctxt "key"
+msgid "R Stick Press"
+msgstr "右スティック押し込み"
+
+msgctxt "key"
+msgid "HOME"
+msgstr "HOME"
+
+msgctxt "key"
+msgid "Capture"
+msgstr "キャプチャー"

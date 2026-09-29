@@ -7,6 +7,18 @@ extends GutTest
 
 const BATTLE := preload("res://scenes/battle/battle.tscn")
 
+var _original_locale: String
+
+
+# 表示名は翻訳されるので、英語のキーで比べるテストは英語に固定する。
+func before_each() -> void:
+	_original_locale = TranslationServer.get_locale()
+	TranslationServer.set_locale("en")
+
+
+func after_each() -> void:
+	TranslationServer.set_locale(_original_locale)
+
 
 func test_every_row_has_keyboard_and_controller() -> void:
 	for row in ControlsGuide.ROWS:
@@ -43,6 +55,17 @@ func test_controller_names_use_switch_labels() -> void:
 		ControlsGuide.describe([GameCommand.Command.HARD_DROP], true),
 		"D-Pad Up",
 		"Hard Drop は十字キーの上"
+	)
+
+
+func test_names_are_shown_in_japanese() -> void:
+	TranslationServer.set_locale(SettingsApplier.GAME_LOCALE)
+	var move: Array = [GameCommand.Command.MOVE_LEFT, GameCommand.Command.MOVE_RIGHT]
+	assert_eq(ControlsGuide.describe(move, false), "← / →", "矢印キーは記号で出す")
+	assert_eq(ControlsGuide.describe([GameCommand.Command.HARD_DROP], false), "スペース", "Space は日本語")
+	assert_eq(ControlsGuide.describe(move, true), "十字キー← / 十字キー→", "十字キーは日本語")
+	assert_eq(
+		ControlsGuide.describe([GameCommand.Command.TARGET_RANDOM], true), "右スティック→", "スティックも日本語"
 	)
 
 
@@ -133,3 +156,21 @@ func test_hidden_pause_menu_does_not_keep_the_focus() -> void:
 		focused != null and battle.get_pause_menu().is_ancestor_of(focused),
 		"閉じた Pause メニューのボタンにフォーカスを残さない"
 	)
+
+
+func test_events_without_a_name_are_skipped() -> void:
+	# 文字にできない入力（マウスなど）は並べない。空文字を訳すと .po のヘッダーが返るため。
+	var action_name: StringName = &"test_controls_guide_mouse_only"
+	InputMap.add_action(action_name)
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	InputMap.action_add_event(action_name, click)
+	var key := InputEventKey.new()
+	key.physical_keycode = KEY_Z
+	InputMap.action_add_event(action_name, key)
+
+	TranslationServer.set_locale(SettingsApplier.GAME_LOCALE)
+	var text: String = ControlsGuide.describe_actions([action_name], false)
+	InputMap.erase_action(action_name)
+
+	assert_eq(text, "Z", "名前の無い入力は飛ばし、名前のある入力だけ並べる")

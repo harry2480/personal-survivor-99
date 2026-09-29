@@ -9,6 +9,8 @@ extends GridContainer
 ## Pro コントローラーのボタン名は、Godot の番号（位置で決まる）を Switch の
 ## 刻印へ読み替えて出す。下のボタン（番号 0）が Switch の B になる。
 ## 見出しにはブランド名を出さない（スタイルガイド §7）。
+##
+## キーとボタンの名前は locale/ja.po の文脈 "key" で訳す。
 
 ## 1 行に並べる操作。複数の Command をまとめた行は、それぞれの先頭の割り当てを並べる。
 ## メニューの決定 / 戻るは Game Command ではないので、Input Action の名前で持つ。
@@ -32,6 +34,9 @@ const ROWS: Array[Dictionary] = [
 
 ## 列の見出し。
 const HEADERS: Array[String] = ["", "KEYBOARD", "CONTROLLER"]
+
+## キーとボタンの名前を訳すときの文脈。
+const NAME_CONTEXT: StringName = &"key"
 
 ## 割り当てが無いときの表示。
 const UNBOUND_TEXT: String = "-"
@@ -150,7 +155,11 @@ static func _names_for(action_name: String, joypad: bool) -> PackedStringArray:
 		if is_joypad != joypad:
 			continue
 		var text: String = describe_event(event)
-		if not text.is_empty() and not names.has(text):
+		if text.is_empty():
+			continue
+		# 空文字を訳すと .po のヘッダーが返るので、空でないものだけ訳す。
+		text = TranslationServer.translate(text, NAME_CONTEXT)
+		if not names.has(text):
 			names.append(text)
 	return names
 

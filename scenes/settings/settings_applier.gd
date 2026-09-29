@@ -14,6 +14,9 @@ extends RefCounted
 ## Game Core は FileSystem も DisplayServer も知らない（要件定義 §17）。
 ## 読み込みと反映は Presentation の担当なので、ここに置く。
 
+## 画面の言語。
+const GAME_LOCALE: String = "ja"
+
 ## Bus の名前（要件定義 §100 / #53 で使う）。
 const BGM_BUS: String = "BGM"
 
@@ -28,6 +31,12 @@ static func apply_all(settings: UserSettings) -> void:
 	apply_audio(settings)
 	apply_video(settings)
 	apply_input(settings)
+	apply_locale()
+
+
+## 画面の言語を日本語にする（文言は locale/ja.po）。
+static func apply_locale() -> void:
+	TranslationServer.set_locale(GAME_LOCALE)
 
 
 ## Gameplay を [GameRules] へ反映する（要件定義 §97）。
