@@ -4,14 +4,18 @@ description: 変更内容をレビューする。設計・テスト・性能の�
 
 # レビュースキル
 
-`git diff` の内容に対して、このプロジェクトの決まりに沿っているかを見る。
+PR のベースブランチとの差分に対して、このプロジェクトの決まりに沿っているかを見る。
 
 ## 1. 変更を把握する
 
 ```sh
-git diff --stat
-git diff
+BASE_REF=origin/main  # PR のベースブランチに合わせる
+git fetch origin
+git diff --stat "$BASE_REF"...HEAD
+git diff "$BASE_REF"...HEAD
 ```
+
+コミット前の変更もあれば `git status` と `git diff HEAD` で合わせて見る。
 
 ## 2. 観点
 

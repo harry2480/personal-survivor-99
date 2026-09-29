@@ -16,9 +16,12 @@ Presentation Layer  →  Battle Layer  →  Game Core Layer
 |---|---|---|
 | 盤面・Piece・回転・重力・Line Clear・Attack・Garbage の規則 | Game Core | `core/`（`board/` `piece/` `rotation/` `scoring/` `attack/` `garbage/` `rules/`） |
 | Player の状態・Target・KO・順位・倍率・Battle の段階 | Battle | `battle/` |
-| CPU の評価・探索・強さ・Simulation | CPU | `cpu/` |
-| 入力の抽象化 | Input | `input/` |
+| CPU の評価・探索・強さ・Simulation | Battle（CPU AI） | `cpu/` |
+| 入力の抽象化（Input Action → Game Command） | 横断 | `input/` |
 | 画面・HUD・盤面表示・Audio | Presentation | `scenes/` `ui/` `audio/` |
+
+- `cpu/` は Battle Layer の一部（要件定義 §18）。Game Core に CPU 固有の分岐を持ち込まず、CPU も Human と同じ Game Command で盤面を操作する
+- `input/` はどの層にも属さない横断モジュール（[docs/アーキテクチャ.md](../../../docs/アーキテクチャ.md)）。Game Command を作って渡す側で、Game Core は `input/` を知らない。物理ボタンの差は `input/` の中で吸収する
 
 迷ったら [docs/要件定義.md](../../../docs/要件定義.md) の該当する節を読む（§119 にファイル配置がある）。
 
