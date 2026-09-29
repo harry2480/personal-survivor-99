@@ -126,4 +126,10 @@ func test_hidden_pause_menu_does_not_keep_the_focus() -> void:
 	battle.set_paused(false)
 	await wait_frames(2)
 
-	assert_null(battle.get_viewport().gui_get_focus_owner(), "閉じたらフォーカスは無い")
+	# フォーカスは画面全体で 1 つなので、ほかのテストが残した画面のボタンが持っていることがある。
+	# 見るのは「閉じた Pause メニューのボタンに残っていないこと」。
+	var focused: Control = battle.get_viewport().gui_get_focus_owner()
+	assert_false(
+		focused != null and battle.get_pause_menu().is_ancestor_of(focused),
+		"閉じた Pause メニューのボタンにフォーカスを残さない"
+	)
