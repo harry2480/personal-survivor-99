@@ -10,14 +10,14 @@ const BATTLE := preload("res://scenes/battle/battle.tscn")
 
 func test_every_row_has_keyboard_and_controller() -> void:
 	for row in ControlsGuide.ROWS:
-		var commands: Array = row["commands"]
+		var actions: Array = ControlsGuide.get_row_actions(row)
 		assert_ne(
-			ControlsGuide.describe(commands, false),
+			ControlsGuide.describe_actions(actions, false),
 			ControlsGuide.UNBOUND_TEXT,
 			"%s を Keyboard で操作できる" % row["label"]
 		)
 		assert_ne(
-			ControlsGuide.describe(commands, true),
+			ControlsGuide.describe_actions(actions, true),
 			ControlsGuide.UNBOUND_TEXT,
 			"%s を Pro コントローラーで操作できる" % row["label"]
 		)
@@ -44,6 +44,27 @@ func test_controller_names_use_switch_labels() -> void:
 		"D-Pad Up",
 		"Hard Drop は十字キーの上"
 	)
+
+
+func test_menu_can_be_confirmed_with_a_controller() -> void:
+	# Godot の既定の ui_accept / ui_cancel には Controller の割り当てが無い。
+	# Switch の慣習どおり A で決定、B で戻る。
+	assert_eq(ControlsGuide.describe_actions(["ui_accept"], true), "A", "決定は A")
+	assert_eq(ControlsGuide.describe_actions(["ui_cancel"], true), "B", "戻るは B")
+	assert_string_contains(
+		ControlsGuide.describe_actions(["ui_accept"], false), "Enter", "Keyboard の決定は Enter"
+	)
+
+
+func test_refresh_does_not_duplicate_rows() -> void:
+	var guide := ControlsGuide.new()
+	add_child_autofree(guide)
+	var cells: int = guide.get_child_count()
+
+	guide.refresh()
+	guide.refresh()
+
+	assert_eq(guide.get_child_count(), cells, "読み直しても行は増えない")
 
 
 func test_guide_lists_every_row() -> void:
@@ -75,3 +96,34 @@ func test_pause_menu_can_be_used_without_a_mouse() -> void:
 		battle.get_pause_menu().get_button(PauseMenu.Action.RESUME),
 		"開いたら RESUME を選んだ状態になる"
 	)
+
+
+func test_pause_menu_regains_focus_after_settings() -> void:
+	var battle: Node = BATTLE.instantiate()
+	add_child_autofree(battle)
+	await wait_frames(3)
+
+	battle.set_paused(true)
+	battle.get_pause_menu().select(PauseMenu.Action.SETTINGS)
+	await wait_frames(1)
+	SceneRouter.close_settings()
+	await wait_frames(2)
+
+	assert_eq(
+		battle.get_viewport().gui_get_focus_owner(),
+		battle.get_pause_menu().get_button(PauseMenu.Action.RESUME),
+		"Settings から戻っても RESUME を選んだ状態になる"
+	)
+
+
+func test_hidden_pause_menu_does_not_keep_the_focus() -> void:
+	# 開いた同じフレームで閉じても、見えないボタンにフォーカスを残さない。
+	var battle: Node = BATTLE.instantiate()
+	add_child_autofree(battle)
+	await wait_frames(3)
+
+	battle.set_paused(true)
+	battle.set_paused(false)
+	await wait_frames(2)
+
+	assert_null(battle.get_viewport().gui_get_focus_owner(), "閉じたらフォーカスは無い")

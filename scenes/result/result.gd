@@ -29,9 +29,14 @@ const ROW_LABELS: Dictionary = {
 	"highest_cpu": "STRONGEST CPU BEATEN",
 }
 
+## 画面が出てからボタンを押せるようになるまでの時間（秒）。
+## 決着の直前に連打していた Hard Drop（Space）や決定ボタンで、結果を読む前に戻らないようにする。
+const INPUT_GUARD_SEC: float = 0.5
+
 var _outcome: BattleOutcome
 var _statistics: Statistics
 var _values: Dictionary = {}
+var _back_button: Button
 
 
 func _ready() -> void:
@@ -60,6 +65,11 @@ func get_statistics() -> Statistics:
 ## 表示している値を返す。
 func get_value(key: String) -> String:
 	return _values.get(key, "")
+
+
+## 戻るボタンを返す。
+func get_back_button() -> Button:
+	return _back_button
 
 
 ## Main Menu へ戻る。
@@ -105,7 +115,9 @@ func _build() -> void:
 	back.pressed.connect(back_to_menu)
 	root.add_child(back)
 	# フォーカスが無いと Keyboard / Controller で押せない。
-	back.grab_focus.call_deferred()
+	# ただし出た直前の連打を拾わないよう、少し待ってから置く。
+	_back_button = back
+	get_tree().create_timer(INPUT_GUARD_SEC).timeout.connect(_focus_back_button)
 
 
 func _build_statistics_label() -> Label:
@@ -121,3 +133,8 @@ func _build_statistics_label() -> Label:
 		]
 	)
 	return label
+
+
+func _focus_back_button() -> void:
+	if is_instance_valid(_back_button) and _back_button.is_visible_in_tree():
+		_back_button.grab_focus()
