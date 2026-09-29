@@ -24,6 +24,9 @@ const STRENGTH_STEP: float = 1.0
 ## Custom で指定できる Variation の上限。
 const MAX_VARIATION: float = 50.0
 
+## 寸法を読む Theme の型（assets/themes/menu_theme.tres）。Settings 画面と揃える。
+const LAYOUT_TYPE: StringName = &"MenuLayout"
+
 var _settings: CpuSettings = CpuSettings.create_default()
 var _mapping: CpuStrengthMapping = null
 var _developer_mode: bool = false
@@ -58,9 +61,8 @@ func build() -> void:
 	_build_custom_controls()
 
 	_advanced_toggle = CheckButton.new()
-	_advanced_toggle.text = "Advanced"
 	_advanced_toggle.toggled.connect(_on_advanced_toggled)
-	add_child(_advanced_toggle)
+	add_child(_labeled("Advanced", _advanced_toggle))
 
 	_advanced_box = VBoxContainer.new()
 	# 通常時は隠しておく。Strength だけ指定すれば済むようにするため（§78）。
@@ -185,6 +187,11 @@ func _build_custom_controls() -> void:
 	_strength_slider.min_value = 0.0
 	_strength_slider.max_value = CpuPreset.MAX_CUSTOM_STRENGTH
 	_strength_slider.step = STRENGTH_STEP
+	# 最小幅が無いと HBox の中で幅 0 に潰れる。
+	_strength_slider.custom_minimum_size.x = get_theme_constant(
+		&"strength_slider_width", LAYOUT_TYPE
+	)
+	_strength_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_strength_slider.value_changed.connect(_on_strength_changed)
 
 	_strength_label = Label.new()
@@ -340,6 +347,10 @@ func _labeled(text: String, control: Control) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	var label := Label.new()
 	label.text = text
+	label.custom_minimum_size.x = get_theme_constant(&"label_width", LAYOUT_TYPE)
+	control.custom_minimum_size.x = maxf(
+		control.custom_minimum_size.x, get_theme_constant(&"control_width", LAYOUT_TYPE)
+	)
 	row.add_child(label)
 	row.add_child(control)
 	return row

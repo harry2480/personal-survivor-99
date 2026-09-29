@@ -1,0 +1,23 @@
+[gd_resource type="Theme" load_steps=2 format=3]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_overlay"]
+bg_color = Color(0.08, 0.08, 0.1, 0.96)
+
+[resource]
+TitleLabel/base_type = &"Label"
+TitleLabel/font_sizes/font_size = 48
+HeaderLabel/base_type = &"Label"
+HeaderLabel/font_sizes/font_size = 32
+SectionLabel/base_type = &"Label"
+SectionLabel/font_sizes/font_size = 20
+MenuStack/base_type = &"VBoxContainer"
+MenuStack/constants/separation = 16
+MenuColumns/base_type = &"HBoxContainer"
+MenuColumns/constants/separation = 64
+OverlayBackground/base_type = &"Panel"
+OverlayBackground/styles/panel = SubResource("StyleBoxFlat_overlay")
+MenuLayout/constants/label_width = 150
+MenuLayout/constants/control_width = 240
+MenuLayout/constants/value_width = 60
+MenuLayout/constants/strength_slider_width = 190
+MenuLayout/constants/button_width = 320

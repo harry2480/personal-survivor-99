@@ -37,6 +37,10 @@ window/stretch/mode="canvas_items"
 
 enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 
+[gui]
+
+theme/custom="res://assets/themes/menu_theme.tres"
+
 [input]
 
 move_left={

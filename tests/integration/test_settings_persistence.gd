@@ -242,7 +242,41 @@ func test_settings_screen_shows_every_section() -> void:
 	]:
 		assert_not_null(screen.get_control(key), "%s を設定できる" % key)
 
-	assert_not_null(screen.get_node_or_null("Settings/CpuDifficultyPanel"), "CPU 難易度も設定できる")
+	assert_not_null(screen.get_difficulty_panel(), "CPU 難易度も設定できる")
+
+
+func test_settings_screen_hides_the_screen_below() -> void:
+	# Main Menu / Battle の上に重ねて開くので、下が透けたり押せたりしないこと。
+	var screen: Control = SETTINGS_SCENE.instantiate()
+	add_child_autofree(screen)
+	await wait_frames(2)
+
+	var background: Control = screen.get_node_or_null("Background")
+	assert_not_null(background, "背景で覆う")
+	assert_eq(background.mouse_filter, Control.MOUSE_FILTER_STOP, "下の画面へクリックを通さない")
+	assert_eq(background.size, screen.get_viewport_rect().size, "画面全体を覆う")
+
+
+func test_settings_sliders_keep_their_width() -> void:
+	# 幅を持たせないと HBox の中で潰れ、つまみだけの点になる。
+	var screen: Control = SETTINGS_SCENE.instantiate()
+	add_child_autofree(screen)
+	await wait_frames(2)
+
+	var width: int = screen.get_theme_constant(&"control_width", &"MenuLayout")
+	assert_gt(width, 0, "入力欄の幅を Theme で決めている")
+
+	for key in [
+		"das_sec",
+		"arr_sec",
+		"soft_drop_multiplier",
+		"master_volume",
+		"bgm_volume",
+		"se_volume",
+		"fps_limit",
+		"stick_dead_zone"
+	]:
+		assert_gte(screen.get_control(key).size.x, float(width), "%s のスライダーに幅がある" % key)
 
 
 func test_settings_screen_saves_on_close() -> void:

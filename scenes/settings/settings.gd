@@ -23,6 +23,13 @@ const VIDEO_KEYS: Array[String] = ["fullscreen", "vsync_enabled", "fps_limit"]
 ## 変えたときに Input を反映する項目。
 const INPUT_KEYS: Array[String] = ["stick_dead_zone"]
 
+## 寸法を読む Theme の型（assets/themes/menu_theme.tres）。
+## 項目名と入力欄の幅を揃えておかないと、HSlider が幅 0 に潰れる。
+const LAYOUT_TYPE: StringName = &"MenuLayout"
+
+## FPS LIMIT が 0 のとき（上限なし）に出す表示。
+const FPS_UNLIMITED_TEXT: String = "OFF"
+
 ## CPU 難易度の設定も同じ画面から触れる（要件定義 §97 の Gameplay）。
 var _difficulty_panel: CpuDifficultyPanel
 var _store: SettingsStore
@@ -34,25 +41,61 @@ func _ready() -> void:
 	_store = SceneRouter.settings_store
 	_settings = _store.load_settings()
 
+	# 下の画面が透けないよう、また下のボタンを押せないように背景で覆う。
+	var background := Panel.new()
+	background.name = "Background"
+	background.theme_type_variation = &"OverlayBackground"
+	background.mouse_filter = Control.MOUSE_FILTER_STOP
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(background)
+
+	# Advanced を開くと縦に伸びるので、はみ出したらスクロールできるようにする。
+	var scroll := ScrollContainer.new()
+	scroll.name = "Scroll"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# Keyboard / Controller で下の項目へ移ったとき、画面外へ出ないようにする。
+	scroll.follow_focus = true
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(scroll)
+
+	var center := CenterContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(center)
+
 	var root := VBoxContainer.new()
 	root.name = "Settings"
-	root.position = Vector2(60.0, 40.0)
-	add_child(root)
+	root.theme_type_variation = &"MenuStack"
+	center.add_child(root)
 
 	var title := Label.new()
 	title.text = "SETTINGS"
+	title.theme_type_variation = &"HeaderLabel"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(title)
 
-	_build_gameplay(root)
-	_build_audio(root)
-	_build_video(root)
-	_build_input(root)
+	var columns := HBoxContainer.new()
+	columns.theme_type_variation = &"MenuColumns"
+	root.add_child(columns)
+
+	var left := VBoxContainer.new()
+	columns.add_child(left)
+	_build_gameplay(left)
+
+	var right := VBoxContainer.new()
+	columns.add_child(right)
+	_build_audio(right)
+	_build_video(right)
+	_build_input(right)
 
 	var back := Button.new()
 	back.name = "BackButton"
 	back.text = "BACK"
+	back.custom_minimum_size.x = _layout(&"control_width")
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	back.pressed.connect(close)
 	root.add_child(back)
+	back.grab_focus.call_deferred()
 
 
 func _exit_tree() -> void:
@@ -73,6 +116,11 @@ func get_settings() -> UserSettings:
 ## 保存先を返す。
 func get_store() -> SettingsStore:
 	return _store
+
+
+## CPU 難易度の選択部分を返す。
+func get_difficulty_panel() -> CpuDifficultyPanel:
+	return _difficulty_panel
 
 
 ## 設定項目の入力欄を返す。無ければ [code]null[/code]。
@@ -154,7 +202,18 @@ func _build_input(root: Control) -> void:
 func _section_label(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
+	label.theme_type_variation = &"SectionLabel"
 	return label
+
+
+func _row(title: String, control: Control) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	var label := Label.new()
+	label.text = title
+	label.custom_minimum_size.x = _layout(&"label_width")
+	row.add_child(label)
+	row.add_child(control)
+	return row
 
 
 func _add_slider(
@@ -166,28 +225,54 @@ func _add_slider(
 	step: float,
 	value: float
 ) -> void:
-	var row := HBoxContainer.new()
-	var label := Label.new()
-	label.text = title
 	var slider := HSlider.new()
 	slider.min_value = minimum
 	slider.max_value = maximum
 	slider.step = step
 	slider.value = value
-	slider.value_changed.connect(func(new_value: float) -> void: _on_value_changed(key, new_value))
-	row.add_child(label)
-	row.add_child(slider)
+	slider.custom_minimum_size.x = _layout(&"control_width")
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+	# 今の値が見えないと調整できないので、横に数値を出す。
+	var value_label := Label.new()
+	value_label.custom_minimum_size.x = _layout(&"value_width")
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value_label.text = _format_value(key, value, step)
+
+	slider.value_changed.connect(
+		func(new_value: float) -> void:
+			value_label.text = _format_value(key, new_value, step)
+			_on_value_changed(key, new_value)
+	)
+	var row: HBoxContainer = _row(title, slider)
+	row.add_child(value_label)
 	root.add_child(row)
 	_controls[key] = slider
 
 
 func _add_check(root: Control, key: String, title: String, value: bool) -> void:
 	var check := CheckButton.new()
-	check.text = title
 	check.button_pressed = value
+	check.custom_minimum_size.x = _layout(&"control_width")
 	check.toggled.connect(func(pressed: bool) -> void: _on_value_changed(key, pressed))
-	root.add_child(check)
+	root.add_child(_row(title, check))
 	_controls[key] = check
+
+
+func _layout(constant_name: StringName) -> int:
+	return get_theme_constant(constant_name, LAYOUT_TYPE)
+
+
+func _format_value(key: String, value: float, step: float) -> String:
+	if key == "fps_limit" and is_zero_approx(value):
+		return FPS_UNLIMITED_TEXT
+	if step >= 1.0:
+		return "%d" % int(value)
+	if step >= 0.1:
+		return "%.1f" % value
+	if step >= 0.01:
+		return "%.2f" % value
+	return "%.3f" % value
 
 
 func _on_value_changed(key: String, value: Variant) -> void:

@@ -182,6 +182,10 @@ func test_settings_from_the_menu_keeps_the_state() -> void:
 
 	assert_false(SceneRouter.is_settings_open(), "閉じると Main Menu へ戻る")
 	assert_eq(menu.get_child_count(), 1, "Settings は取り除かれる")
+	var focused: Control = menu.get_viewport().gui_get_focus_owner()
+	assert_true(
+		focused is Button and focused.text == "SETTINGS", "閉じたあとも Keyboard / Controller で操作できる"
+	)
 
 
 func test_settings_from_pause_keeps_the_battle() -> void:
