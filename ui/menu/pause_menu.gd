@@ -28,6 +28,7 @@ var _buttons: Dictionary = {}
 func _ready() -> void:
 	if _buttons.is_empty():
 		build()
+	visibility_changed.connect(_on_visibility_changed)
 
 
 ## 中身を組み立てる。
@@ -55,6 +56,19 @@ func get_actions() -> Array[int]:
 	for action in _buttons:
 		actions.append(action)
 	return actions
+
+
+## 開いたら先頭の項目を選んでおく。フォーカスが無いと Keyboard / Controller で選べない。
+func _on_visibility_changed() -> void:
+	if is_visible_in_tree():
+		_focus_first.call_deferred()
+
+
+# 遅らせている間に閉じられていたら、見えないボタンへフォーカスを置かない。
+# 置くと、閉じたあとの Space（Hard Drop）が見えないボタンを押してしまう。
+func _focus_first() -> void:
+	if is_visible_in_tree() and _buttons.has(Action.RESUME):
+		_buttons[Action.RESUME].grab_focus()
 
 
 ## 項目を選ぶ（テストと Controller 用）。

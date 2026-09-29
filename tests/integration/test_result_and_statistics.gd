@@ -173,6 +173,43 @@ func test_result_screen_shows_the_outcome() -> void:
 	SceneRouter.current_state = GameState.State.MAIN_MENU
 
 
+func test_result_screen_ignores_input_right_after_it_appears() -> void:
+	# 決着直前の連打（Space / 決定ボタン）で、結果を読む前に戻らないこと。
+	SceneRouter.current_state = GameState.State.MAIN_MENU
+	var previous_scene_id: int = _current_scene_id()
+	SceneRouter.start_battle()
+	SceneRouter.finish_battle(_outcome(7, 3, 55))
+	await _wait_for_result_scene(previous_scene_id)
+	var screen: Node = get_tree().current_scene
+
+	var back: Button = screen.get_back_button()
+	assert_ne(screen.get_viewport().gui_get_focus_owner(), back, "出た直後は押せない")
+
+	await wait_seconds(screen.INPUT_GUARD_SEC + 0.1)
+	assert_eq(screen.get_viewport().gui_get_focus_owner(), back, "少し待てば Keyboard / Controller で押せる")
+
+	SceneRouter.current_state = GameState.State.MAIN_MENU
+
+
+func test_result_screen_does_not_steal_the_focus() -> void:
+	# 待っている間にほかのボタンへフォーカスが置かれていたら、そのままにする。
+	SceneRouter.current_state = GameState.State.MAIN_MENU
+	var previous_scene_id: int = _current_scene_id()
+	SceneRouter.start_battle()
+	SceneRouter.finish_battle(_outcome(7, 3, 55))
+	await _wait_for_result_scene(previous_scene_id)
+	var screen: Node = get_tree().current_scene
+
+	var other := Button.new()
+	add_child_autofree(other)
+	other.grab_focus()
+	await wait_seconds(screen.INPUT_GUARD_SEC + 0.1)
+
+	assert_eq(screen.get_viewport().gui_get_focus_owner(), other, "ほかのボタンのフォーカスを奪わない")
+
+	SceneRouter.current_state = GameState.State.MAIN_MENU
+
+
 func test_result_screen_records_the_battle() -> void:
 	SceneRouter.current_state = GameState.State.MAIN_MENU
 	var previous_scene_id: int = _current_scene_id()

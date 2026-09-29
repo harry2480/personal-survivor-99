@@ -37,6 +37,7 @@ var _input: InputManager
 var _board_panel: PlayerBoardPanel
 var _opponent_grid: OpponentGrid
 var _hud: BattleHud
+var _controls_guide: ControlsGuide
 var _pause_menu: PauseMenu
 var _audio: AudioManager
 var _music: MusicManager
@@ -242,6 +243,12 @@ func _build_views() -> void:
 	add_child(_hud)
 	_hud.bind(manager, VIEWER_ID, _runner.get_ko_system(), _runner.get_target_manager())
 
+	# 相手一覧の右の空きに、Keyboard と Pro コントローラーの操作方法を出す。
+	_controls_guide = ControlsGuide.new()
+	_controls_guide.name = "ControlsGuide"
+	_controls_guide.position = MARGIN + Vector2(560.0, 0.0)
+	add_child(_controls_guide)
+
 	if palette is BoardPalette:
 		_board_panel.set_palette(palette)
 		_opponent_grid.set_palette(palette)
@@ -354,6 +361,8 @@ func _on_settings_closed() -> void:
 		return
 	# Settings で変えた値を、いまの Battle へ効かせる。
 	_apply_user_settings()
+	if _controls_guide != null:
+		_controls_guide.refresh()
 	if _pause_menu != null:
 		_pause_menu.visible = _paused
 
