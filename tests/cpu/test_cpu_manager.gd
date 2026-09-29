@@ -4,6 +4,15 @@ extends GutTest
 
 const SEED: int = 20260920
 
+## Hold の取り違えを確かめるときに置く手数。
+const HOLD_MISDROP_PLACEMENTS: int = 40
+
+## カバレッジ計測中の手数。取り違えから置き直す分岐を通れば足りる。
+const HOLD_MISDROP_COVERAGE_PLACEMENTS: int = 8
+
+## カバレッジ計測で CPU を走らせるテストを飛ばすための判定。
+const CoverageGuard = preload("res://tests/coverage_guard.gd")
+
 var manager: BattleManager
 var mapping: CpuStrengthMapping
 var cpus: CpuManager
@@ -214,6 +223,8 @@ func _run_detailed(misdrop_rate: float, placements: int) -> Array[int]:
 
 
 func test_detailed_uses_hold_when_it_scores_better() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	# Hold の候補も探索に入れる。Misdrop なしでも Hold を使う場面がある。
 	var result: Array[int] = _run_detailed(0.0, 40)
 
@@ -223,10 +234,16 @@ func test_detailed_uses_hold_when_it_scores_better() -> void:
 
 func test_hold_misdrop_still_places_the_active_piece() -> void:
 	# Hold の取り違えが起きても、出てきた Piece で置き直して 1 手を終える。
-	var result: Array[int] = _run_detailed(1.0, 40)
+	# カバレッジ計測では飛ばさず手数を減らす。置き直す分岐（DetailedCpu）はここでしか通らない。
+	var placements: int = (
+		HOLD_MISDROP_COVERAGE_PLACEMENTS
+		if CoverageGuard.is_measuring()
+		else HOLD_MISDROP_PLACEMENTS
+	)
+	var result: Array[int] = _run_detailed(1.0, placements)
 
 	assert_gt(result[1], 0, "Hold の取り違えが起きる")
-	assert_eq(result[0], 40, "毎回 1 手置き切る")
+	assert_eq(result[0], placements, "毎回 1 手置き切る")
 
 
 # --- 切り替えの連続性（#42 の完了条件） -------------------------------------
