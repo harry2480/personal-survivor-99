@@ -38,7 +38,7 @@ func after_each() -> void:
 # テスト用の保存ファイルを書き戻してしまう。
 func _free_settings_screens() -> void:
 	for node in get_tree().root.find_children("*", "Control", true, false):
-		if node.get_script() == SETTINGS_SCRIPT and is_instance_valid(node):
+		if is_instance_valid(node) and node.get_script() == SETTINGS_SCRIPT:
 			node.free()
 
 
