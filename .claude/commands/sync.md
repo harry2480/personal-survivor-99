@@ -19,12 +19,22 @@ description: main ブランチに戻ってリモートと同期する
 
 3. **main へ切り替え**: `git checkout main`
 
-4. **最新化**: `git pull --ff-only origin main`
+4. **先行・遅れの確認**: pull の前に、ローカルの `main` と `origin/main` の差を数える。
+
+   ```sh
+   git rev-list --left-right --count main...origin/main   # 左: ローカルだけにある / 右: origin だけにある
+   ```
+
+   左が 1 以上（ローカルの `main` にだけコミットがある）なら、ここで止めてユーザーに報告する。
+   その場合 `git pull --ff-only` は失敗せず「Already up to date」で終わるため、同期できたと誤認してしまう。
+   ローカルの `main` にあるコミットは `main` への直接 commit なので、扱い（別ブランチへ移すなど）を確認する。
+
+5. **最新化**: `git pull --ff-only origin main`
 
    fast-forward できない（ローカルの `main` が `origin/main` と分岐している）場合は、
    ここで止めてユーザーに報告する。`main` 上に merge commit を作ると、`main` への直接 commit になる。
 
-5. **完了報告**: 切り替え完了と、`main` の最新コミットを報告する。
+6. **完了報告**: 切り替え完了と、`main` の最新コミットを報告する。
 
 ## 注意事項
 
