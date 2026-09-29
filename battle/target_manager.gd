@@ -141,7 +141,7 @@ func _select_with_cache(player: BattlePlayerState) -> int:
 	return _select_by_mode(player)
 
 
-# 攻撃対象になりうる Player を控える。
+# 攻撃対象になりうる Player を控える（要件定義 §53。脱落済みはここで除く）。
 func _refresh_targetable() -> void:
 	_targetable.clear()
 	_targetable_index.clear()
@@ -199,23 +199,6 @@ func _select_by_mode(player: BattlePlayerState) -> int:
 		TargetMode.Mode.COUNTER:
 			return _select_counter(player)
 	return _select_random(player)
-
-
-## 攻撃対象になりうる Player を返す（要件定義 §53）。
-##
-## 自分自身と脱落済み Player は必ず除外する。
-func get_candidates(player: BattlePlayerState) -> Array[BattlePlayerState]:
-	var candidates: Array[BattlePlayerState] = []
-	if player == null:
-		return candidates
-
-	for other in _manager.get_players():
-		if other.player_id == player.player_id:
-			continue
-		if not other.is_targetable():
-			continue
-		candidates.append(other)
-	return candidates
 
 
 ## 指定した Player を狙っている Player を返す（Counter Target 用）。
@@ -287,12 +270,12 @@ func _select_counter(player: BattlePlayerState) -> int:
 	return attackers[_rng.randi_range(0, attackers.size() - 1)].player_id
 
 
+# 候補は控えと同じく ID の小さい順に並んでいるので、同じ危険度なら先に見た
+# （ID の小さい）方が残る。選択を決定論的にするため。
 func _select_most_dangerous_of(candidates: Array[BattlePlayerState]) -> int:
 	var best: BattlePlayerState = candidates[0]
 	for candidate in candidates:
 		if candidate.danger_level > best.danger_level:
-			best = candidate
-		elif candidate.danger_level == best.danger_level and candidate.player_id < best.player_id:
 			best = candidate
 	return best.player_id
 

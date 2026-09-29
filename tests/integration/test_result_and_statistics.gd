@@ -4,6 +4,8 @@ extends GutTest
 ## （要件定義 §99 / §112 / §113、MVP 受入条件 21）。
 
 const RESULT_SCENE := preload("res://scenes/result/result.tscn")
+## Scene の切り替えを待つ上限（秒）。
+const SCENE_WAIT_SEC: float = 5.0
 const TEST_DIR: String = "user://test_statistics/"
 const SEED: int = 20260922
 
@@ -14,9 +16,12 @@ func before_each() -> void:
 	DirAccess.make_dir_recursive_absolute(TEST_DIR)
 	store = SettingsStore.new(TEST_DIR)
 	store.delete_document(SettingsStore.STATISTICS_DOCUMENT)
+	# Result 画面は SceneRouter の保存先へ書く。本物の記録を汚さないよう差し替える。
+	SceneRouter.settings_store = store
 
 
 func after_each() -> void:
+	SceneRouter.settings_store = SettingsStore.new()
 	store.delete_document(SettingsStore.STATISTICS_DOCUMENT)
 
 
@@ -170,16 +175,62 @@ func test_result_screen_shows_the_outcome() -> void:
 
 func test_result_screen_records_the_battle() -> void:
 	SceneRouter.current_state = GameState.State.MAIN_MENU
+	var previous_scene_id: int = _current_scene_id()
 	SceneRouter.start_battle()
 	SceneRouter.finish_battle(_outcome(1, 2, 10))
+	# 決着すると SceneRouter が Result 画面を読み込む。その画面が記録する。
+	await _wait_for_result_scene(previous_scene_id)
+	var screen: Node = get_tree().current_scene
 
+	assert_eq(screen.get_statistics().games_played, 1, "通算へ足し込まれる")
+	assert_eq(Statistics.load_from(store).games_played, 1, "Settings と同じ保存先へ書く（§98）")
+
+	SceneRouter.current_state = GameState.State.MAIN_MENU
+
+
+func test_result_screen_does_not_record_the_previous_battle_again() -> void:
+	SceneRouter.current_state = GameState.State.MAIN_MENU
+	var previous_scene_id: int = _current_scene_id()
+	SceneRouter.start_battle()
+	SceneRouter.finish_battle(_outcome(1, 2, 10))
+	await _wait_for_result_scene(previous_scene_id)
+
+	# 結果を渡さずに決着したとき、前の Battle の結果を足し直さない。
+	SceneRouter.current_state = GameState.State.PLAYING
+	SceneRouter.finish_battle()
 	var screen: Control = RESULT_SCENE.instantiate()
 	add_child_autofree(screen)
 	await wait_frames(2)
 
-	assert_gte(screen.get_statistics().games_played, 1, "通算へ足し込まれる")
+	assert_eq(Statistics.load_from(store).games_played, 1, "前の Battle を二重に数えない")
 
 	SceneRouter.current_state = GameState.State.MAIN_MENU
+
+
+# SceneRouter の切り替えはフレーム終端まで遅れるので、新しい Result 画面が出るまで待つ。
+#
+# wait_frames は物理フレームを数える。重いフレームの後は 1 フレームの間に物理フレームが
+# 何回も進むので、切り替えより先に待ちが終わることがある（カバレッジ計測で起きていた）。
+# 前のテストの Result 画面が current_scene に残っていることがあるので、切り替え前の
+# Scene とは別のものを待つ。前の Scene は切り替えで解放されるので、Node ではなく
+# instance ID で比べる（解放済みの Node を lambda で捕まえるとエラーになる）。
+func _wait_for_result_scene(previous_scene_id: int) -> void:
+	var path: String = SceneRouter.SCENE_PATHS[GameState.State.RESULT]
+	await wait_until(
+		func() -> bool:
+			var scene: Node = get_tree().current_scene
+			return (
+				scene != null
+				and scene.get_instance_id() != previous_scene_id
+				and scene.scene_file_path == path
+			),
+		SCENE_WAIT_SEC
+	)
+
+
+func _current_scene_id() -> int:
+	var scene: Node = get_tree().current_scene
+	return scene.get_instance_id() if scene != null else 0
 
 
 # --- Debug Overlay（要件定義 §113） -----------------------------------------
@@ -261,6 +312,27 @@ func test_logger_records_the_required_events() -> void:
 	ko.dispose()
 
 
+func test_logger_records_garbage_of_the_real_battle() -> void:
+	# 実際の Battle は GarbageRouter を通さず Runner が Garbage を流す（§112）。
+	var runner := CpuBattleRunner.new(9, CpuDistribution.create_default(), null, SEED)
+	var logger := BattleLogger.new()
+	logger.set_enabled(true)
+	logger.bind(runner.get_manager(), runner.get_ko_system(), runner.get_target_manager(), runner)
+
+	var text: String = ""
+	for _frame in range(60 * 120):
+		runner.step(CpuBattleRunner.DEFAULT_FRAME_DELTA)
+		text = "\n".join(logger.get_lines())
+		if text.contains("garbage_send") and text.contains("garbage_apply"):
+			break
+
+	assert_true(text.contains("garbage_send"), "Garbage Send を記録する")
+	assert_true(text.contains("garbage_apply"), "Garbage Apply を記録する")
+
+	logger.unbind()
+	runner.dispose()
+
+
 func test_logger_is_silent_when_disabled() -> void:
 	var logger := BattleLogger.new()
 	logger.set_enabled(false)
@@ -278,3 +350,15 @@ func test_logger_keeps_a_bounded_history() -> void:
 		logger.log_event("garbage_send", str(index))
 
 	assert_eq(logger.get_lines().size(), BattleLogger.MAX_LINES, "古い行から捨てる")
+
+
+func test_fatal_errors_keep_a_bounded_history() -> void:
+	# Fatal Error は Release でも記録する。繰り返し起きても増え続けない。
+	var logger := BattleLogger.new()
+	logger.set_enabled(false)
+
+	for index in range(BattleLogger.MAX_LINES + 50):
+		logger.log_fatal(str(index))
+
+	assert_eq(logger.get_lines().size(), BattleLogger.MAX_LINES, "古い行から捨てる")
+	assert_push_error_count(BattleLogger.MAX_LINES + 50, "Fatal Error はエラーとしても出す")

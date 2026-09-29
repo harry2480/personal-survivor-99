@@ -26,14 +26,31 @@ gh repo view --json name,defaultBranchRef
 ### Step 2: ブランチ保護
 
 ```sh
-gh api "repos/{owner}/{repo}/branches/main/protection" 2>/dev/null || echo "未設定"
+if protection="$(gh api "repos/{owner}/{repo}/branches/main/protection" 2>&1)"; then
+  printf '%s\n' "$protection"
+elif printf '%s' "$protection" | grep -q 'Branch not protected'; then
+  echo "branch protection: 未設定"
+else
+  printf '%s\n' "$protection" >&2
+  echo "ブランチ保護を確認できませんでした" >&2
+fi
+
+# Ruleset で保護している場合はこちらに出る（branch protection が未設定でも保護されうる）
+gh api "repos/{owner}/{repo}/rules/branches/main"
 ```
 
-確認する内容。
+「未設定」と報告してよいのは、GitHub が `Branch not protected`（HTTP 404）を返したときだけ。
+権限不足（HTTP 403）や通信障害などで確認できなかったときは、エラーをそのまま見せて**ここで止める**
+（未設定と報告しない）。branch protection が未設定でも、Ruleset 側に `pull_request` などの
+ルールがあれば保護はされている。
 
-- `main` への直接 push が禁止されているか
-- required status check が **`CI ステータス確認`**（`.github/workflows/ci.yml` の `ci-status`）になっているか
-- PR 必須になっているか
+確認する内容（[docs/リポジトリ設定手順.md](../../docs/リポジトリ設定手順.md) の「必要な状態」）。
+
+- `main` への直接 push が禁止されているか（PR 必須になっているか）
+- `allow_force_pushes.enabled` が `false` で、`main` への force push が禁止されているか
+- `allow_deletions.enabled` が `false` で、`main` の削除が禁止されているか
+- required status check が **`CI ステータス確認`**（`.github/workflows/ci.yml` の `ci-status`）**のみ**になっているか
+  （ほかの check が required に入っていれば、それも案内する）
 
 ### Step 3: auto-merge
 

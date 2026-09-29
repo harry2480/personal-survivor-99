@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 連続試合でメモリが増え続けないかを計測する。
 #
-# Battle を 50 回作って捨て、メモリと Object 数の推移を出す（#56 の完了条件）。
+# Battle を 50 回作って捨て、メモリと Object 数の推移を出し、増分で合否を判定する（#56 の完了条件）。
 # CI では動かさない。Release 前と、参照の持ち方を変えたときに手で実行する。
 #
 # 環境変数:
@@ -21,5 +21,8 @@ version="$(assert_godot_version "$godot_bin" "$repo_root")"
 echo "Godot: ${version}"
 echo
 
-"$godot_bin" --headless --import >/dev/null
-"$godot_bin" --headless -s res://tools/stress_battles.gd
+# Godot はスクリプトエラーでも終了コード 0 を返すので、出力の ERROR も見る。
+# 増分の判定に落ちたときは stress_battles.gd が終了コード 1 を返す。
+run_godot_step "Import" "$GODOT_DIAGNOSTICS_ERROR" "$godot_bin" --headless --import
+run_godot_step "Stress battles" "$GODOT_DIAGNOSTICS_ERROR" \
+  "$godot_bin" --headless -s res://tools/stress_battles.gd
