@@ -5,6 +5,9 @@ extends GutTest
 const SEEDS: Array[int] = [20260920, 7, 4242]
 const PIECES_PER_RUN: int = 15
 
+## カバレッジ計測で CPU を走らせるテストを飛ばすための判定。
+const CoverageGuard = preload("res://tests/coverage_guard.gd")
+
 var mapping: CpuStrengthMapping
 
 
@@ -227,6 +230,8 @@ func _average_lines(strength: float) -> float:
 
 
 func test_higher_strength_clears_more_lines() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	# Phase 5 の完了条件「Strength を上げると評価指標が単調に改善する」。
 	# 試行はすべて Seed 固定。強さ以外の条件は揃えている。
 	var weak: float = _average_lines(10.0)
@@ -236,6 +241,8 @@ func test_higher_strength_clears_more_lines() -> void:
 
 
 func test_line_clearing_improves_across_the_range() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	var results: Array[float] = []
 	for strength in [10.0, 40.0, 70.0, 100.0]:
 		results.append(_average_lines(strength))
@@ -245,6 +252,8 @@ func test_line_clearing_improves_across_the_range() -> void:
 
 
 func test_strongest_cpu_survives() -> void:
+	if CoverageGuard.skip_heavy_test(self):
+		return
 	var profile: CpuProfile = mapping.create_profile(100.0)
 
 	for run_seed in SEEDS:
