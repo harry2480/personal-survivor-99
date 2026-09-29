@@ -13,9 +13,11 @@ description: 現在の変更に対して設計レビューを行う (project)
 
 1. **変更内容の把握**: `git diff` で変更されたファイルの差分を取得し、変更内容を把握する。必要に応じて関連ファイルも読み込む。
 
-2. **ガイドラインの参照**: 変更対象に応じて以下のガイドラインを参照する。
-   - `admin/src/server/contexts/` または `webapp/src/server/contexts/` 配下の変更: [docs/backend-architecture-guide.md](docs/backend-architecture-guide.md)
-   - `admin/src/client/` または `admin/src/app/` 配下の変更: [docs/admin-ui-guidelines.md](docs/admin-ui-guidelines.md)
+2. **ガイドラインの参照**: 変更対象に応じて以下を参照する。
+   - `core/` `battle/` `cpu/` `input/` 配下: [docs/アーキテクチャ.md](../../docs/アーキテクチャ.md) と [docs/コーディング規約.md](../../docs/コーディング規約.md)
+   - `scenes/` `ui/` `audio/` 配下: [docs/フロントエンドアーキテクチャ.md](../../docs/フロントエンドアーキテクチャ.md)
+   - `tests/` 配下: [docs/テストガイドライン.md](../../docs/テストガイドライン.md)
+   - 判断に迷う場合: [docs/要件定義.md](../../docs/要件定義.md)（一次情報）
 
 3. **レビュー実施**: 以下の観点でレビューを行う。
    - **アーキテクチャ**: ガイドラインに沿ったレイヤー構成・責務分離ができているか

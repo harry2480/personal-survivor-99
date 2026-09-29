@@ -4,6 +4,8 @@ extends GutTest
 ## （要件定義 §99 / §112 / §113、MVP 受入条件 21）。
 
 const RESULT_SCENE := preload("res://scenes/result/result.tscn")
+## Scene の切り替えを待つ上限（秒）。
+const SCENE_WAIT_SEC: float = 5.0
 const TEST_DIR: String = "user://test_statistics/"
 const SEED: int = 20260922
 
@@ -173,10 +175,11 @@ func test_result_screen_shows_the_outcome() -> void:
 
 func test_result_screen_records_the_battle() -> void:
 	SceneRouter.current_state = GameState.State.MAIN_MENU
+	var previous_scene_id: int = _current_scene_id()
 	SceneRouter.start_battle()
 	SceneRouter.finish_battle(_outcome(1, 2, 10))
 	# 決着すると SceneRouter が Result 画面を読み込む。その画面が記録する。
-	await wait_frames(2)
+	await _wait_for_result_scene(previous_scene_id)
 	var screen: Node = get_tree().current_scene
 
 	assert_eq(screen.get_statistics().games_played, 1, "通算へ足し込まれる")
@@ -187,9 +190,10 @@ func test_result_screen_records_the_battle() -> void:
 
 func test_result_screen_does_not_record_the_previous_battle_again() -> void:
 	SceneRouter.current_state = GameState.State.MAIN_MENU
+	var previous_scene_id: int = _current_scene_id()
 	SceneRouter.start_battle()
 	SceneRouter.finish_battle(_outcome(1, 2, 10))
-	await wait_frames(2)
+	await _wait_for_result_scene(previous_scene_id)
 
 	# 結果を渡さずに決着したとき、前の Battle の結果を足し直さない。
 	SceneRouter.current_state = GameState.State.PLAYING
@@ -201,6 +205,32 @@ func test_result_screen_does_not_record_the_previous_battle_again() -> void:
 	assert_eq(Statistics.load_from(store).games_played, 1, "前の Battle を二重に数えない")
 
 	SceneRouter.current_state = GameState.State.MAIN_MENU
+
+
+# SceneRouter の切り替えはフレーム終端まで遅れるので、新しい Result 画面が出るまで待つ。
+#
+# wait_frames は物理フレームを数える。重いフレームの後は 1 フレームの間に物理フレームが
+# 何回も進むので、切り替えより先に待ちが終わることがある（カバレッジ計測で起きていた）。
+# 前のテストの Result 画面が current_scene に残っていることがあるので、切り替え前の
+# Scene とは別のものを待つ。前の Scene は切り替えで解放されるので、Node ではなく
+# instance ID で比べる（解放済みの Node を lambda で捕まえるとエラーになる）。
+func _wait_for_result_scene(previous_scene_id: int) -> void:
+	var path: String = SceneRouter.SCENE_PATHS[GameState.State.RESULT]
+	await wait_until(
+		func() -> bool:
+			var scene: Node = get_tree().current_scene
+			return (
+				scene != null
+				and scene.get_instance_id() != previous_scene_id
+				and scene.scene_file_path == path
+			),
+		SCENE_WAIT_SEC
+	)
+
+
+func _current_scene_id() -> int:
+	var scene: Node = get_tree().current_scene
+	return scene.get_instance_id() if scene != null else 0
 
 
 # --- Debug Overlay（要件定義 §113） -----------------------------------------
