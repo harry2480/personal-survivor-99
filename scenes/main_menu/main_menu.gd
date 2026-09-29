@@ -13,6 +13,10 @@ extends Control
 ## Play を押したときに使う Action。
 const START_ACTION: StringName = &"ui_accept"
 
+## 寸法を読む Theme の型（assets/themes/menu_theme.tres）。
+const LAYOUT_TYPE: StringName = &"MenuLayout"
+
+var _menu: Control
 var _difficulty_panel: CpuDifficultyPanel
 var _player_count_spin: SpinBox
 var _play_button: Button
@@ -21,13 +25,21 @@ var _quit_button: Button
 
 
 func _ready() -> void:
+	# 画面の中央に置く。子は Menu の 1 つだけにしておく（Settings はこの横に重なる）。
+	var center := CenterContainer.new()
+	center.name = "Menu"
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(center)
+	_menu = center
+
 	var root := VBoxContainer.new()
-	root.name = "Menu"
-	root.position = Vector2(80.0, 60.0)
-	add_child(root)
+	root.theme_type_variation = &"MenuStack"
+	center.add_child(root)
 
 	var title := Label.new()
 	title.text = "PROJECT 99"
+	title.theme_type_variation = &"TitleLabel"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(title)
 
 	root.add_child(_build_player_count_row())
@@ -41,9 +53,11 @@ func _ready() -> void:
 	_quit_button = _add_button(root, "QUIT", _on_quit_pressed)
 
 	_load_from_router()
+	_play_button.grab_focus.call_deferred()
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# フォーカスのあるボタンは GUI が先に押すので、ここに来るのはフォーカスが無いときだけ。
 	# Settings を開いている間は、下の Main Menu で Play を始めない。
 	if SceneRouter.is_settings_open():
 		return
@@ -74,11 +88,13 @@ func _build_player_count_row() -> HBoxContainer:
 	var row := HBoxContainer.new()
 	var label := Label.new()
 	label.text = "PLAYERS"
+	label.custom_minimum_size.x = get_theme_constant(&"label_width", LAYOUT_TYPE)
 	_player_count_spin = SpinBox.new()
 	_player_count_spin.min_value = 2
 	_player_count_spin.max_value = 99
 	_player_count_spin.step = 1
 	_player_count_spin.value = 99
+	_player_count_spin.custom_minimum_size.x = get_theme_constant(&"control_width", LAYOUT_TYPE)
 	row.add_child(label)
 	row.add_child(_player_count_spin)
 	return row
@@ -87,6 +103,7 @@ func _build_player_count_row() -> HBoxContainer:
 func _add_button(parent: Control, text: String, handler: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
+	button.custom_minimum_size.x = get_theme_constant(&"button_width", LAYOUT_TYPE)
 	button.pressed.connect(handler)
 	parent.add_child(button)
 	return button
@@ -106,14 +123,22 @@ func _on_play_pressed() -> void:
 func _on_settings_pressed() -> void:
 	# 状態は MAIN_MENU のまま、この画面の上に重ねる。
 	var overlay: Node = SceneRouter.open_settings(self)
+	if overlay == null:
+		return
+	# 背景はマウスしか止めないので、隠しておかないと Tab / 十字キーで下のボタンへ
+	# フォーカスが移り、Settings を開いたまま Play や Quit を押せてしまう。
+	_menu.visible = false
 	# Settings で変えた CPU 難易度を、閉じたあとの表示へ反映する。
-	if overlay != null and not overlay.tree_exited.is_connected(_on_settings_closed):
+	if not overlay.tree_exited.is_connected(_on_settings_closed):
 		overlay.tree_exited.connect(_on_settings_closed)
 
 
 func _on_settings_closed() -> void:
 	if is_inside_tree():
+		_menu.visible = true
 		_load_from_router()
+		# 閉じたあとフォーカスが無いと、Keyboard / Controller で操作できなくなる。
+		_settings_button.grab_focus()
 
 
 func _on_quit_pressed() -> void:
