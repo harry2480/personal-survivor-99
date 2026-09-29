@@ -188,6 +188,34 @@ func test_settings_from_the_menu_keeps_the_state() -> void:
 	)
 
 
+func test_settings_from_the_menu_blocks_the_menu_below() -> void:
+	# Settings の背景はマウスしか止めない。Tab / 十字キーで下の Play や Quit へ
+	# フォーカスが移らないこと。
+	var menu: Control = MAIN_MENU.instantiate()
+	add_child_autofree(menu)
+	await wait_frames(1)
+
+	menu._on_settings_pressed()
+	await wait_frames(1)
+
+	assert_false(menu.get_node("Menu").visible, "開いている間は Main Menu を隠す")
+	for _i in range(10):
+		var event := InputEventAction.new()
+		event.action = &"ui_focus_next"
+		event.pressed = true
+		menu.get_viewport().push_input(event)
+		await wait_frames(1)
+		var focused: Control = menu.get_viewport().gui_get_focus_owner()
+		assert_false(
+			focused != null and menu.get_node("Menu").is_ancestor_of(focused),
+			"Settings を開いたまま Main Menu のボタンへフォーカスが移らない"
+		)
+
+	SceneRouter.close_settings()
+	await wait_frames(1)
+	assert_true(menu.get_node("Menu").visible, "閉じたら Main Menu を戻す")
+
+
 func test_settings_from_pause_keeps_the_battle() -> void:
 	var setup: BattleSetup = BattleSetup.create_default()
 	setup.player_count = 2
