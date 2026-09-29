@@ -149,7 +149,13 @@ func _build_gameplay(root: Control) -> void:
 	_add_slider(root, "das_sec", "DAS", 0.0, 0.5, 0.001, _settings.das_sec)
 	_add_slider(root, "arr_sec", "ARR", 0.0, 0.2, 0.001, _settings.arr_sec)
 	_add_slider(
-		root, "soft_drop_multiplier", "SOFT DROP", 1.0, 100.0, 0.5, _settings.soft_drop_multiplier
+		root,
+		"soft_drop_multiplier",
+		"SOFT DROP SPEED",
+		1.0,
+		100.0,
+		0.5,
+		_settings.soft_drop_multiplier
 	)
 	_add_check(root, "ghost_enabled", "GHOST", _settings.ghost_enabled)
 
@@ -195,7 +201,7 @@ func _build_input(root: Control) -> void:
 	)
 
 	var label := Label.new()
-	label.text = "KEYBOARD %d / CONTROLLER %d" % [keyboard.size(), controller.size()]
+	label.text = tr("KEYBOARD %d / CONTROLLER %d") % [keyboard.size(), controller.size()]
 	root.add_child(label)
 
 

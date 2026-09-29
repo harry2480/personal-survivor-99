@@ -84,7 +84,7 @@ func _build() -> void:
 		"quad": str(_outcome.quad_count),
 		"t_spin": str(_outcome.t_spin_count),
 		"perfect_clear": str(_outcome.perfect_clear_count),
-		"duration": "%.1f s" % _outcome.duration_sec,
+		"duration": tr("%.1f s") % _outcome.duration_sec,
 		"highest_cpu": "%.0f" % _outcome.highest_cpu_strength_defeated,
 	}
 
@@ -111,7 +111,7 @@ func _build() -> void:
 func _build_statistics_label() -> Label:
 	var label := Label.new()
 	label.text = (
-		"TOTAL  GAMES %d / WINS %d / TOP10 %d / AVG RANK %.1f / KO %d"
+		tr("TOTAL  GAMES %d / WINS %d / TOP10 %d / AVG RANK %.1f / KO %d")
 		% [
 			_statistics.games_played,
 			_statistics.wins,

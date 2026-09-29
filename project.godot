@@ -37,6 +37,10 @@ window/stretch/mode="canvas_items"
 
 enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 
+[internationalization]
+
+locale/translations=PackedStringArray("res://locale/ja.po")
+
 [gui]
 
 theme/custom="res://assets/themes/menu_theme.tres"

@@ -252,7 +252,15 @@ func _set_value(key: String, value: String) -> void:
 	_values[key] = value
 	var label: Label = _value_labels.get(key, null)
 	if label != null:
-		label.text = value
+		label.text = _display_text(key, value)
+
+
+# 画面に出す文字。get_value() は元の値を返し、表示だけ翻訳する。
+# Target Mode の "KO" は KO 数の "KO" と訳が違うので、文脈を付けて訳す。
+func _display_text(key: String, value: String) -> String:
+	if key == "target_mode":
+		return tr(value, &"target_mode")
+	return value
 
 
 func _format_rank(viewer: BattlePlayerState) -> String:
