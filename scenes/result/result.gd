@@ -135,6 +135,10 @@ func _build_statistics_label() -> Label:
 	return label
 
 
+# 待っている間にほかの操作でフォーカスが置かれていたら、奪わない。
 func _focus_back_button() -> void:
-	if is_instance_valid(_back_button) and _back_button.is_visible_in_tree():
-		_back_button.grab_focus()
+	if not is_instance_valid(_back_button) or not _back_button.is_visible_in_tree():
+		return
+	if get_viewport().gui_get_focus_owner() != null:
+		return
+	_back_button.grab_focus()
