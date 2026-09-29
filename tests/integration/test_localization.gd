@@ -29,6 +29,13 @@ func test_locale_is_japanese() -> void:
 	assert_eq(TranslationServer.get_locale(), "ja", "起動時に日本語にする")
 
 
+func test_startup_settings_switch_to_japanese() -> void:
+	# 起動時（Boot）は apply_all() でまとめて反映する。その中で日本語にすること。
+	TranslationServer.set_locale("en")
+	SettingsApplier.apply_all(UserSettings.new())
+	assert_eq(TranslationServer.get_locale(), SettingsApplier.GAME_LOCALE, "apply_all() で日本語になる")
+
+
 func test_menu_and_settings_are_translated() -> void:
 	_assert_translated(
 		[

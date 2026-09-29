@@ -156,3 +156,21 @@ func test_hidden_pause_menu_does_not_keep_the_focus() -> void:
 		focused != null and battle.get_pause_menu().is_ancestor_of(focused),
 		"閉じた Pause メニューのボタンにフォーカスを残さない"
 	)
+
+
+func test_events_without_a_name_are_skipped() -> void:
+	# 文字にできない入力（マウスなど）は並べない。空文字を訳すと .po のヘッダーが返るため。
+	var action_name: StringName = &"test_controls_guide_mouse_only"
+	InputMap.add_action(action_name)
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	InputMap.action_add_event(action_name, click)
+	var key := InputEventKey.new()
+	key.physical_keycode = KEY_Z
+	InputMap.action_add_event(action_name, key)
+
+	TranslationServer.set_locale(SettingsApplier.GAME_LOCALE)
+	var text: String = ControlsGuide.describe_actions([action_name], false)
+	InputMap.erase_action(action_name)
+
+	assert_eq(text, "Z", "名前の無い入力は飛ばし、名前のある入力だけ並べる")
