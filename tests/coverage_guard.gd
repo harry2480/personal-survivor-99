@@ -15,11 +15,18 @@ extends RefCounted
 const COVERAGE_ENV: String = "PROJECT99_COVERAGE"
 
 
+## カバレッジ計測中なら [code]true[/code] を返す。
+##
+## 飛ばすほどではないが、回数を減らして走らせたいテストで使う。
+static func is_measuring() -> bool:
+	return OS.get_environment(COVERAGE_ENV) == "1"
+
+
 ## カバレッジ計測中なら [param test] を保留にして [code]true[/code] を返す。
 ##
 ## 呼び出し側は [code]true[/code] ならそのまま return する。
 static func skip_heavy_test(test: GutTest) -> bool:
-	if OS.get_environment(COVERAGE_ENV) != "1":
+	if not is_measuring():
 		return false
 	test.pending("カバレッジ計測中は重いテストを飛ばす（scripts/run-tests.sh では走る）")
 	return true

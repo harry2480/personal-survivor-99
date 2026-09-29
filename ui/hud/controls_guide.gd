@@ -13,6 +13,7 @@ extends GridContainer
 ## キーとボタンの名前は locale/ja.po の文脈 "key" で訳す。
 
 ## 1 行に並べる操作。複数の Command をまとめた行は、それぞれの先頭の割り当てを並べる。
+## メニューの決定 / 戻るは Game Command ではないので、Input Action の名前で持つ。
 const ROWS: Array[Dictionary] = [
 	{"label": "MOVE", "commands": [GameCommand.Command.MOVE_LEFT, GameCommand.Command.MOVE_RIGHT]},
 	{"label": "SOFT DROP", "commands": [GameCommand.Command.SOFT_DROP]},
@@ -27,6 +28,8 @@ const ROWS: Array[Dictionary] = [
 	{"label": "TARGET BADGE", "commands": [GameCommand.Command.TARGET_BADGE]},
 	{"label": "TARGET COUNTER", "commands": [GameCommand.Command.TARGET_COUNTER]},
 	{"label": "PAUSE", "commands": [GameCommand.Command.PAUSE]},
+	{"label": "MENU OK", "actions": ["ui_accept"]},
+	{"label": "MENU BACK", "actions": ["ui_cancel"]},
 ]
 
 ## 列の見出し。
@@ -87,20 +90,39 @@ func refresh() -> void:
 	for header in HEADERS:
 		_add_cell(header)
 	for row in ROWS:
+		var actions: Array = get_row_actions(row)
 		_add_cell(row["label"])
-		_add_cell(describe(row["commands"], false))
-		_add_cell(describe(row["commands"], true))
+		_add_cell(describe_actions(actions, false))
+		_add_cell(describe_actions(actions, true))
+
+
+## 行が表す Input Action の名前を返す。
+static func get_row_actions(row: Dictionary) -> Array:
+	if row.has("actions"):
+		return row["actions"]
+	var actions: Array = []
+	for command in row["commands"]:
+		actions.append(GameCommand.get_action_name(command))
+	return actions
 
 
 ## 操作の割り当てを文字で返す。[param joypad] が真なら Pro コントローラー側。
 static func describe(commands: Array, joypad: bool) -> String:
-	var names: PackedStringArray = PackedStringArray()
+	var actions: Array = []
 	for command in commands:
-		var bound: PackedStringArray = _names_for(GameCommand.get_action_name(command), joypad)
+		actions.append(GameCommand.get_action_name(command))
+	return describe_actions(actions, joypad)
+
+
+## Input Action の割り当てを文字で返す。[param joypad] が真なら Pro コントローラー側。
+static func describe_actions(actions: Array, joypad: bool) -> String:
+	var names: PackedStringArray = PackedStringArray()
+	for action_name in actions:
+		var bound: PackedStringArray = _names_for(action_name, joypad)
 		if bound.is_empty():
 			continue
 		# まとめた行は先頭だけ、1 つの操作の行はすべて並べる（HOLD の L / R など）。
-		if commands.size() > 1:
+		if actions.size() > 1:
 			names.append(bound[0])
 		else:
 			names.append_array(bound)

@@ -195,6 +195,9 @@ func _build_custom_controls() -> void:
 	_strength_slider.value_changed.connect(_on_strength_changed)
 
 	_strength_label = Label.new()
+	# 桁が変わっても行の幅が動かないようにする（スタイルガイド §7）。
+	_strength_label.custom_minimum_size.x = get_theme_constant(&"value_width", LAYOUT_TYPE)
+	_strength_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	var strength_row := HBoxContainer.new()
 	strength_row.add_child(_strength_slider)
 	strength_row.add_child(_strength_label)

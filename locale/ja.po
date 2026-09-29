@@ -303,6 +303,12 @@ msgstr "狙い方：カウンター"
 msgid "PAUSE"
 msgstr "一時停止"
 
+msgid "MENU OK"
+msgstr "メニュー：決定"
+
+msgid "MENU BACK"
+msgstr "メニュー：戻る"
+
 msgctxt "key"
 msgid "Left"
 msgstr "←"
@@ -330,6 +336,10 @@ msgstr "Esc"
 msgctxt "key"
 msgid "Enter"
 msgstr "Enter"
+
+msgctxt "key"
+msgid "Kp Enter"
+msgstr "テンキー Enter"
 
 msgctxt "key"
 msgid "D-Pad Up"
