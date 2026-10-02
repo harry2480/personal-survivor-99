@@ -32,6 +32,9 @@ const PALETTE_PATH: String = "res://assets/themes/board_palette.tres"
 ## 画面の余白（ピクセル）。
 const MARGIN := Vector2(24.0, 24.0)
 
+## 自分の盤面・HUD の上端（MARGIN からのずらし）。相手一覧（高さ 320 px）のすぐ下に置く。
+const BOARD_TOP: float = 336.0
+
 var _runner: CpuBattleRunner
 var _input: InputManager
 var _board_panel: PlayerBoardPanel
@@ -232,14 +235,14 @@ func _build_views() -> void:
 
 	_board_panel = PlayerBoardPanel.new()
 	_board_panel.name = "PlayerBoardPanel"
-	_board_panel.position = MARGIN + Vector2(0.0, 360.0)
+	_board_panel.position = MARGIN + Vector2(0.0, BOARD_TOP)
 	add_child(_board_panel)
 	_board_panel.bind(viewer.session, viewer)
 	_apply_user_settings()
 
 	_hud = BattleHud.new()
 	_hud.name = "BattleHud"
-	_hud.position = MARGIN + Vector2(560.0, 360.0)
+	_hud.position = MARGIN + Vector2(560.0, BOARD_TOP)
 	add_child(_hud)
 	_hud.bind(manager, VIEWER_ID, _runner.get_ko_system(), _runner.get_target_manager())
 
@@ -279,7 +282,7 @@ func _build_audio() -> void:
 func _build_debug_overlay() -> void:
 	_debug_overlay = DebugOverlay.new()
 	_debug_overlay.name = "DebugOverlay"
-	_debug_overlay.position = MARGIN + Vector2(900.0, 360.0)
+	_debug_overlay.position = MARGIN + Vector2(900.0, BOARD_TOP)
 	add_child(_debug_overlay)
 	_debug_overlay.bind(_runner)
 

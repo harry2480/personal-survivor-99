@@ -15,7 +15,8 @@ extends Control
 ## 毎フレーム読む。毎フレーム盤面全体を走査しない（要件定義 §108）。
 
 ## 1 マスの大きさ（ピクセル）。
-const CELL_SIZE: int = 24
+## 相手一覧の下に置いても 800 px の画面に収まる大きさにする。
+const CELL_SIZE: int = 20
 
 ## Danger の縁の太さ（ピクセル）。
 const DANGER_BORDER: int = 4
