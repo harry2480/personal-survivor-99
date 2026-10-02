@@ -176,10 +176,11 @@ func test_views_fit_in_the_screen() -> void:
 		float(ProjectSettings.get_setting("display/window/size/viewport_height"))
 	)
 	for view_name in ["PlayerBoardPanel", "BattleHud", "ControlsGuide", "DebugOverlay"]:
-		var view: Control = scene.get_node(view_name)
-		var bottom_right: Vector2 = view.position + view.size
-		assert_lte(bottom_right.x, screen.x, "%s の右端が画面の中に収まる" % view_name)
-		assert_lte(bottom_right.y, screen.y, "%s の下端が画面の中に収まる" % view_name)
+		var rect: Rect2 = (scene.get_node(view_name) as Control).get_global_rect()
+		assert_gte(rect.position.x, 0.0, "%s の左端が画面の中に収まる" % view_name)
+		assert_gte(rect.position.y, 0.0, "%s の上端が画面の中に収まる" % view_name)
+		assert_lte(rect.end.x, screen.x, "%s の右端が画面の中に収まる" % view_name)
+		assert_lte(rect.end.y, screen.y, "%s の下端が画面の中に収まる" % view_name)
 
 
 func test_player_board_is_below_the_opponent_grid() -> void:
@@ -189,7 +190,9 @@ func test_player_board_is_below_the_opponent_grid() -> void:
 	var grid: OpponentGrid = scene.get_node("OpponentGrid")
 	var rows: int = ceili(float(grid.get_tiles().size()) / float(OpponentGrid.COLUMNS))
 	var grid_bottom: float = (
-		grid.position.y + float(rows) * (OpponentGrid.TILE_SIZE.y + OpponentGrid.TILE_MARGIN)
+		grid.position.y
+		+ float(rows) * OpponentGrid.TILE_SIZE.y
+		+ float(rows - 1) * OpponentGrid.TILE_MARGIN
 	)
 	var panel: Control = scene.get_node("PlayerBoardPanel")
 	assert_gte(panel.position.y, grid_bottom, "自分の盤面が相手一覧に重ならない")
