@@ -165,3 +165,31 @@ func test_defeat_sound_plays_once_when_the_viewer_loses() -> void:
 	assert_eq(audio.get_played_count(AudioManager.Event.DEFEAT), 1, "Defeat は 1 回だけ")
 	assert_eq(audio.get_played_count(AudioManager.Event.VICTORY), 0, "負けたら Victory は鳴らない")
 	SceneRouter.current_state = GameState.State.MAIN_MENU
+
+
+func test_views_fit_in_the_screen() -> void:
+	var scene: Node = _new_battle_scene()
+	await wait_frames(3)
+
+	var screen := Vector2(
+		float(ProjectSettings.get_setting("display/window/size/viewport_width")),
+		float(ProjectSettings.get_setting("display/window/size/viewport_height"))
+	)
+	for view_name in ["PlayerBoardPanel", "BattleHud", "ControlsGuide", "DebugOverlay"]:
+		var view: Control = scene.get_node(view_name)
+		var bottom_right: Vector2 = view.position + view.size
+		assert_lte(bottom_right.x, screen.x, "%s の右端が画面の中に収まる" % view_name)
+		assert_lte(bottom_right.y, screen.y, "%s の下端が画面の中に収まる" % view_name)
+
+
+func test_player_board_is_below_the_opponent_grid() -> void:
+	var scene: Node = _new_battle_scene()
+	await wait_frames(3)
+
+	var grid: OpponentGrid = scene.get_node("OpponentGrid")
+	var rows: int = ceili(float(grid.get_tiles().size()) / float(OpponentGrid.COLUMNS))
+	var grid_bottom: float = (
+		grid.position.y + float(rows) * (OpponentGrid.TILE_SIZE.y + OpponentGrid.TILE_MARGIN)
+	)
+	var panel: Control = scene.get_node("PlayerBoardPanel")
+	assert_gte(panel.position.y, grid_bottom, "自分の盤面が相手一覧に重ならない")
